@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "org.ijdiff"
-    version = "0.1.0-SNAPSHOT"
+    version = "1.0.0"
 
     repositories {
         google()

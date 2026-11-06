@@ -93,7 +93,7 @@ You can override any setting from the CLI (including switching between the Swing
 ./gradlew test :app:installDist :app:fatJar :app:stageJpackageInput
 ```
 - Launcher binary: `app/build/install/ijdiff/bin/ijdiff`
-- Standalone Fat-JAR: `app/build/libs/ijdiff-standalone-0.1.0-SNAPSHOT-all.jar`
+- Standalone Fat-JAR: `app/build/libs/ijdiff-standalone-1.0.0-all.jar`
 - Staged `jpackage` input: `app/build/jpackage-input/ijdiff-standalone.jar`
 
 ### Multi-Platform CI & Native Installers (GitHub Actions)
