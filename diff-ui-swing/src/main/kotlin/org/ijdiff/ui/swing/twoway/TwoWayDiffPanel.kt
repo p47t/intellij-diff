@@ -407,7 +407,8 @@ class TwoWayDiffPanel(
     }
 
     private fun setupKeyboardShortcuts() {
-        val menuMask = Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+        val menuMask = runCatching { Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx }
+            .getOrDefault(KeyEvent.CTRL_DOWN_MASK)
         val inputMap = getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
 
         // Ctrl+S / Cmd+S -> Explicit Save
