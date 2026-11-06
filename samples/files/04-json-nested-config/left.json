@@ -1,0 +1,19 @@
+{
+  "name": "@acme/web-dashboard",
+  "version": "2.4.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "clsx": "^2.0.0",
+    "lucide-react": "^0.344.0"
+  },
+  "legacyFlags": {
+    "enableIE11Polyfill": true
+  }
+}

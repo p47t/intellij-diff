@@ -1,0 +1,39 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    alias(libs.plugins.kotlin.jvm) apply false
+}
+
+allprojects {
+    group = "org.ijdiff"
+    version = "0.1.0-SNAPSHOT"
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+
+    configure<JavaPluginExtension> {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        "testImplementation"(platform(rootProject.libs.junit.bom))
+        "testImplementation"(rootProject.libs.junit.jupiter)
+        "testRuntimeOnly"(rootProject.libs.junit.platform.launcher)
+    }
+}

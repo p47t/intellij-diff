@@ -1,0 +1,3 @@
+first line added to empty file
+second line added
+third line added

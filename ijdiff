@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIST_BIN="$SCRIPT_DIR/app/build/install/ijdiff/bin/ijdiff"
+
+if [[ ! -x "$DIST_BIN" ]]; then
+    "$SCRIPT_DIR/gradlew" -q :app:installDist
+fi
+
+exec "$DIST_BIN" "$@"

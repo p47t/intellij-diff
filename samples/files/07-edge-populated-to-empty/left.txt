@@ -1,0 +1,3 @@
+line one to be removed
+line two to be removed
+line three to be removed
