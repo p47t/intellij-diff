@@ -2,6 +2,7 @@ package org.ijdiff.ui.swing.dirdiff
 
 import org.ijdiff.model.dirdiff.DirCompareMode
 import org.ijdiff.model.dirdiff.DirDiffEntry
+import org.ijdiff.model.dirdiff.DirDiffLayout
 import org.ijdiff.model.dirdiff.DirDiffSession
 import org.ijdiff.model.dirdiff.DirDiffStatus
 import org.ijdiff.model.dirdiff.DirSyncAction
@@ -12,6 +13,8 @@ import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
 import java.awt.Font
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.BorderFactory
@@ -31,6 +34,7 @@ import javax.swing.ListSelectionModel
 import javax.swing.SwingConstants
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import javax.swing.plaf.basic.BasicSplitPaneUI
 import javax.swing.table.AbstractTableModel
 import javax.swing.table.DefaultTableCellRenderer
 
@@ -50,7 +54,12 @@ class DirDiffMasterDetailPanel(
     private var suppressSelectionListener = false
 
     private val summaryLabel = JLabel()
+    private val tableScroll: JScrollPane
     private val splitPane: JSplitPane
+
+    /** Set once the user drags the divider; auto-sizing then stops so their choice is kept. */
+    private var userResizedDivider = false
+    private var applyingAutoDivider = false
 
     init {
         if (session.allEntries.value.isEmpty()) {
@@ -60,19 +69,59 @@ class DirDiffMasterDetailPanel(
         add(createToolbar(), BorderLayout.NORTH)
         configureTable()
 
-        val tableScroll = JScrollPane(table).apply {
+        tableScroll = JScrollPane(table).apply {
             border = BorderFactory.createEmptyBorder()
             preferredSize = Dimension(900, 260)
+            minimumSize = Dimension(200, 0)
         }
 
         detailContainer.preferredSize = Dimension(900, 440)
+        detailContainer.minimumSize = Dimension(200, 0)
         splitPane = JSplitPane(JSplitPane.VERTICAL_SPLIT, tableScroll, detailContainer).apply {
-            resizeWeight = 0.36
+            // Extra space on window resize goes to the diff preview; the list is sized by autoSizeMasterPane()
+            resizeWeight = 0.0
             isContinuousLayout = true
         }
+        installDividerDragListener()
+        splitPane.addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) = autoSizeMasterPane()
+        })
         add(splitPane, BorderLayout.CENTER)
 
         refreshTableAndDetail()
+    }
+
+    /**
+     * Sizes the file list to fit its visible rows, capped at [DirDiffLayout.DEFAULT_MAX_FRACTION] of the
+     * split pane height. Does nothing once the user has dragged the divider.
+     */
+    private fun autoSizeMasterPane() {
+        if (userResizedDivider) return
+        val available = splitPane.height - splitPane.dividerSize
+        if (available <= 0) return
+        val headerHeight = (table.tableHeader?.preferredSize?.height ?: 0) +
+            tableScroll.insets.top + tableScroll.insets.bottom
+        val target = DirDiffLayout.computeMasterPaneHeight(
+            itemCount = tableModel.rowCount,
+            rowHeight = table.rowHeight + table.intercellSpacing.height,
+            headerHeight = headerHeight,
+            availableHeight = available
+        )
+        if (splitPane.dividerLocation == target) return
+        applyingAutoDivider = true
+        try {
+            splitPane.dividerLocation = target
+        } finally {
+            applyingAutoDivider = false
+        }
+    }
+
+    private fun installDividerDragListener() {
+        (splitPane.ui as? BasicSplitPaneUI)?.divider?.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (!applyingAutoDivider) userResizedDivider = true
+            }
+        })
     }
 
     fun applyTheme() {
@@ -85,6 +134,9 @@ class DirDiffMasterDetailPanel(
         table.revalidate()
         table.repaint()
         currentDiffPanel?.applyTheme()
+        // updateUI() recreates the split pane divider, so the drag listener must be reinstalled
+        installDividerDragListener()
+        autoSizeMasterPane()
         revalidate()
         repaint()
     }
@@ -317,6 +369,7 @@ class DirDiffMasterDetailPanel(
         } finally {
             suppressSelectionListener = false
         }
+        autoSizeMasterPane()
         updateDetailPane()
     }
 

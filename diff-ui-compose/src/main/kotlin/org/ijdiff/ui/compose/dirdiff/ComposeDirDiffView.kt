@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.ijdiff.model.dirdiff.DirCompareMode
 import org.ijdiff.model.dirdiff.DirDiffEntry
+import org.ijdiff.model.dirdiff.DirDiffLayout
 import org.ijdiff.model.dirdiff.DirDiffSession
 import org.ijdiff.model.dirdiff.DirDiffStatus
 import org.ijdiff.model.dirdiff.DirSyncAction
@@ -219,173 +221,186 @@ fun ComposeDirDiffView(
             )
         }
 
-        // Master Table (36% height)
-        val rowHeightDp = (theme.uiFontSizePt + 11).coerceAtLeast(24).dp
+        // Master table + detail preview share the space below the toolbar
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            val availableHeightDp = maxHeight
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Master Table: sized to fit its rows, capped at DirDiffLayout.DEFAULT_MAX_FRACTION of availableHeightDp
+                val rowHeightDp = (theme.uiFontSizePt + 11).coerceAtLeast(24).dp
+                val masterHeightDp = DirDiffLayout.computeMasterPaneHeight(
+                    itemCount = filteredEntries.size,
+                    rowHeight = rowHeightDp.value,
+                    // Header row plus top/bottom borders
+                    headerHeight = rowHeightDp.value + 1f,
+                    availableHeight = availableHeightDp.value
+                ).dp
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.36f)
-                .background(palette.editorBg)
-                .border(0.5.dp, palette.gutterBorder)
-        ) {
-            // Table Header
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(rowHeightDp)
-                    .background(palette.gutterBg)
-                    .border(0.5.dp, palette.gutterBorder)
-                    .padding(horizontal = 8.dp)
-            ) {
-                Text(
-                    text = "Left File",
-                    color = palette.editorFg,
-                    fontFamily = theme.uiFontFamily,
-                    fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(0.38f)
-                )
-                Text(
-                    text = "Left Size",
-                    color = palette.editorFg,
-                    fontFamily = theme.uiFontFamily,
-                    fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(90.dp).padding(end = 8.dp)
-                )
-                Text(
-                    text = "Action",
-                    color = palette.editorFg,
-                    fontFamily = theme.uiFontFamily,
-                    fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(86.dp)
-                )
-                Text(
-                    text = "Right File",
-                    color = palette.editorFg,
-                    fontFamily = theme.uiFontFamily,
-                    fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(0.38f).padding(start = 8.dp)
-                )
-                Text(
-                    text = "Right Size",
-                    color = palette.editorFg,
-                    fontFamily = theme.uiFontFamily,
-                    fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(90.dp)
-                )
-            }
-
-            // Table Rows
-            LazyColumn(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(filteredEntries, key = { it.relativePath }) { entry ->
-                    val isSelected = selectedEntry?.relativePath == entry.relativePath
-                    val rowBg = when {
-                        isSelected -> palette.accentBlue.copy(alpha = if (palette.isDark) 0.42f else 0.25f)
-                        entry.status == DirDiffStatus.ADDED -> palette.insertedLineBg
-                        entry.status == DirDiffStatus.DELETED -> palette.deletedLineBg
-                        entry.status == DirDiffStatus.MODIFIED -> palette.modifiedLineBg
-                        else -> palette.editorBg
-                    }
-
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(masterHeightDp)
+                        .background(palette.editorBg)
+                        .border(0.5.dp, palette.gutterBorder)
+                ) {
+                    // Table Header
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(rowHeightDp)
-                            .background(rowBg)
-                            .clickable { session.selectEntry(entry) }
+                            .background(palette.gutterBg)
+                            .border(0.5.dp, palette.gutterBorder)
                             .padding(horizontal = 8.dp)
                     ) {
                         Text(
-                            text = if (entry.leftFile != null) entry.relativePath else "",
+                            text = "Left File",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
-                            fontSize = theme.uiFontSizePt.sp,
-                            maxLines = 1,
+                            fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(0.38f)
                         )
                         Text(
-                            text = entry.leftFile?.size?.let { formatSize(it) } ?: "",
+                            text = "Left Size",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
-                            fontSize = theme.uiFontSizePt.sp,
+                            fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                            fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.End,
                             modifier = Modifier.width(90.dp).padding(end = 8.dp)
                         )
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .width(86.dp)
-                                .fillMaxHeight()
-                                .clickable {
-                                    session.setSyncAction(entry.relativePath, cycleActionFor(entry))
-                                }
-                        ) {
-                            Text(
-                                text = "${entry.status.symbol}  ${entry.syncAction.symbol}",
-                                color = palette.editorFg,
-                                fontFamily = theme.editorFontFamily,
-                                fontSize = theme.uiFontSizePt.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                         Text(
-                            text = if (entry.rightFile != null) entry.relativePath else "",
+                            text = "Action",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
-                            fontSize = theme.uiFontSizePt.sp,
-                            maxLines = 1,
+                            fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.width(86.dp)
+                        )
+                        Text(
+                            text = "Right File",
+                            color = palette.editorFg,
+                            fontFamily = theme.uiFontFamily,
+                            fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(0.38f).padding(start = 8.dp)
                         )
                         Text(
-                            text = entry.rightFile?.size?.let { formatSize(it) } ?: "",
+                            text = "Right Size",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
-                            fontSize = theme.uiFontSizePt.sp,
+                            fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                            fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.End,
                             modifier = Modifier.width(90.dp)
                         )
                     }
-                }
-            }
-        }
 
-        // Detail Embedded 2-Way Diff Preview (64% height)
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.64f)
-                .clipToBounds()
-                .background(palette.editorBg)
-        ) {
-            val activePreview = previewSession
-            if (activePreview != null) {
-                ComposeTwoWayDiffView(session = activePreview)
-            } else {
-                val msg = when {
-                    selectedEntry == null -> "Select a file pair above to view its diff"
-                    selectedEntry?.isBinary == true -> "Binary file (${selectedEntry?.relativePath}) - cannot display text diff"
-                    else -> "No preview available"
+                    // Table Rows
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(filteredEntries, key = { it.relativePath }) { entry ->
+                            val isSelected = selectedEntry?.relativePath == entry.relativePath
+                            val rowBg = when {
+                                isSelected -> palette.accentBlue.copy(alpha = if (palette.isDark) 0.42f else 0.25f)
+                                entry.status == DirDiffStatus.ADDED -> palette.insertedLineBg
+                                entry.status == DirDiffStatus.DELETED -> palette.deletedLineBg
+                                entry.status == DirDiffStatus.MODIFIED -> palette.modifiedLineBg
+                                else -> palette.editorBg
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(rowHeightDp)
+                                    .background(rowBg)
+                                    .clickable { session.selectEntry(entry) }
+                                    .padding(horizontal = 8.dp)
+                            ) {
+                                Text(
+                                    text = if (entry.leftFile != null) entry.relativePath else "",
+                                    color = palette.editorFg,
+                                    fontFamily = theme.uiFontFamily,
+                                    fontSize = theme.uiFontSizePt.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(0.38f)
+                                )
+                                Text(
+                                    text = entry.leftFile?.size?.let { formatSize(it) } ?: "",
+                                    color = palette.editorFg,
+                                    fontFamily = theme.uiFontFamily,
+                                    fontSize = theme.uiFontSizePt.sp,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.width(90.dp).padding(end = 8.dp)
+                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .width(86.dp)
+                                        .fillMaxHeight()
+                                        .clickable {
+                                            session.setSyncAction(entry.relativePath, cycleActionFor(entry))
+                                        }
+                                ) {
+                                    Text(
+                                        text = "${entry.status.symbol}  ${entry.syncAction.symbol}",
+                                        color = palette.editorFg,
+                                        fontFamily = theme.editorFontFamily,
+                                        fontSize = theme.uiFontSizePt.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = if (entry.rightFile != null) entry.relativePath else "",
+                                    color = palette.editorFg,
+                                    fontFamily = theme.uiFontFamily,
+                                    fontSize = theme.uiFontSizePt.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(0.38f).padding(start = 8.dp)
+                                )
+                                Text(
+                                    text = entry.rightFile?.size?.let { formatSize(it) } ?: "",
+                                    color = palette.editorFg,
+                                    fontFamily = theme.uiFontFamily,
+                                    fontSize = theme.uiFontSizePt.sp,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.width(90.dp)
+                                )
+                            }
+                        }
+                    }
                 }
-                Text(
-                    text = msg,
-                    color = palette.gutterFg,
-                    fontFamily = theme.uiFontFamily,
-                    fontSize = theme.uiFontSizePt.sp,
-                    fontStyle = FontStyle.Italic
-                )
+
+                // Detail Embedded 2-Way Diff Preview (takes all remaining height)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clipToBounds()
+                        .background(palette.editorBg)
+                ) {
+                    val activePreview = previewSession
+                    if (activePreview != null) {
+                        ComposeTwoWayDiffView(session = activePreview)
+                    } else {
+                        val msg = when {
+                            selectedEntry == null -> "Select a file pair above to view its diff"
+                            selectedEntry?.isBinary == true -> "Binary file (${selectedEntry?.relativePath}) - cannot display text diff"
+                            else -> "No preview available"
+                        }
+                        Text(
+                            text = msg,
+                            color = palette.gutterFg,
+                            fontFamily = theme.uiFontFamily,
+                            fontSize = theme.uiFontSizePt.sp,
+                            fontStyle = FontStyle.Italic
+                        )
+                    }
+                }
             }
         }
     }
