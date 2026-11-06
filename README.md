@@ -87,12 +87,20 @@ You can override any setting from the CLI (including switching between the Swing
     prompt = false
 ```
 
-### Build Standalone Distribution & Fat-JAR
+### Build Standalone Distribution, Fat-JAR, and Native Installers
 ```bash
-./gradlew test :app:installDist :app:fatJar
+# Build launcher script distribution, standalone fat-JAR, and stage for jpackage
+./gradlew test :app:installDist :app:fatJar :app:stageJpackageInput
 ```
 - Launcher binary: `app/build/install/ijdiff/bin/ijdiff`
 - Standalone Fat-JAR: `app/build/libs/ijdiff-standalone-0.1.0-SNAPSHOT-all.jar`
+- Staged `jpackage` input: `app/build/jpackage-input/ijdiff-standalone.jar`
+
+### Multi-Platform CI & Native Installers (GitHub Actions)
+The GitHub Actions workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs unit, corpus, and offscreen UI render tests and builds native self-contained packages (with a bundled modular JRE via `jpackage`) for all three desktop operating systems:
+- **Linux (`x86_64`)**: `ijdiff_<version>_amd64.deb`, `ijdiff-<version>-linux-x64-portable.tar.gz`, and `ijdiff-<version>-linux-x64.jar`
+- **macOS (`arm64`)**: `ijdiff-<version>-macos-arm64.dmg`, `ijdiff-<version>-macos-arm64.pkg`, and `ijdiff-<version>-macos-arm64.jar`
+- **Windows (`x86_64`)**: `ijdiff-<version>-windows-x64.msi`, `ijdiff-<version>-windows-x64-portable.zip`, and `ijdiff-<version>-windows-x64.jar`
 
 ## Module Architecture
 
