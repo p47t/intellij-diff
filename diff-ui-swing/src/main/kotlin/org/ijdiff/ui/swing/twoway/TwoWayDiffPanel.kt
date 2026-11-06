@@ -10,6 +10,7 @@ import org.ijdiff.ui.swing.editor.DiffEditorPane
 import org.ijdiff.ui.swing.editor.EditorSide
 import org.ijdiff.ui.swing.splitter.DiffDividerComponent
 import org.ijdiff.ui.swing.splitter.DiffOverviewBar
+import org.ijdiff.ui.swing.theme.DiffIcons
 import org.ijdiff.ui.swing.theme.DiffThemeManager
 import java.awt.BorderLayout
 import java.awt.CardLayout
@@ -102,8 +103,8 @@ class TwoWayDiffPanel(
     private val rightHeaderLabel = JLabel()
     private val statusCountLabel = JLabel()
     private val saveButton = JButton("Save (Ctrl+S)")
-    private val undoLeftBtn = JButton("↶ L")
-    private val undoRightBtn = JButton("↶ R")
+    private val undoLeftBtn = JButton("Undo L", DiffIcons.undo())
+    private val undoRightBtn = JButton("Undo R", DiffIcons.undo())
 
     private val debounceTimer = Timer(140) {
         session.recomputeNow()
@@ -129,11 +130,17 @@ class TwoWayDiffPanel(
     }
 
     fun applyTheme() {
+        val boldUi = DiffThemeManager.uiBoldFont()
+        saveButton.font = boldUi
+        statusCountLabel.font = boldUi
+        leftHeaderLabel.font = boldUi
+        rightHeaderLabel.font = boldUi
         leftEditorPane.applyTheme()
         rightEditorPane.applyTheme()
         unifiedPane.applyTheme()
         dividerComponent.repaint()
         overviewBar.repaint()
+        revalidate()
         repaint()
     }
 
@@ -187,7 +194,7 @@ class TwoWayDiffPanel(
         val dirtyNames = buildList {
             if (session.leftDocument.isDirty.value) add(session.leftDocument.title)
             if (session.rightDocument.isDirty.value) add(session.rightDocument.title)
-        }.joinToString("\n• ", prefix = "• ")
+        }.joinToString("\n- ", prefix = "- ")
 
         val choice = JOptionPane.showConfirmDialog(
             parent,
@@ -217,14 +224,14 @@ class TwoWayDiffPanel(
         toolbar.isFloatable = false
         toolbar.border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
 
-        val prevBtn = JButton("↑ Prev").apply {
+        val prevBtn = JButton("Prev", DiffIcons.arrowUp()).apply {
             toolTipText = "Previous Difference (Shift+F7)"
             addActionListener {
                 session.prevDifference()?.let { scrollToFragment(it) }
                 refreshUI()
             }
         }
-        val nextBtn = JButton("↓ Next").apply {
+        val nextBtn = JButton("Next", DiffIcons.arrowDown()).apply {
             toolTipText = "Next Difference (F7)"
             addActionListener {
                 session.nextDifference()?.let { scrollToFragment(it) }
@@ -284,16 +291,17 @@ class TwoWayDiffPanel(
             }
         }
 
+        val boldUi = DiffThemeManager.uiBoldFont()
         saveButton.apply {
             toolTipText = "Explicitly Save Modified Files to Disk (Ctrl+S)"
-            font = font.deriveFont(Font.BOLD)
+            font = boldUi
             addActionListener {
                 session.saveAll()
                 refreshUI()
             }
         }
 
-        statusCountLabel.font = statusCountLabel.font.deriveFont(Font.BOLD, 12f)
+        statusCountLabel.font = boldUi
 
         toolbar.add(prevBtn)
         toolbar.add(Box.createHorizontalStrut(4))
@@ -320,10 +328,11 @@ class TwoWayDiffPanel(
         val container = JPanel(BorderLayout())
 
         // File path header strip
+        val boldUi = DiffThemeManager.uiBoldFont()
         val headerGrid = JPanel(GridLayout(1, 2, 36, 0)).apply {
             border = BorderFactory.createEmptyBorder(4, 10, 4, 24)
-            leftHeaderLabel.font = leftHeaderLabel.font.deriveFont(Font.BOLD, 12f)
-            rightHeaderLabel.font = rightHeaderLabel.font.deriveFont(Font.BOLD, 12f)
+            leftHeaderLabel.font = boldUi
+            rightHeaderLabel.font = boldUi
             add(leftHeaderLabel)
             add(rightHeaderLabel)
         }

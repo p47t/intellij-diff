@@ -82,12 +82,13 @@ object SyntaxStyleResolver {
             scheme.getStyle(Token.SEPARATOR)?.foreground = palette.editorFg
         }
         // Ensure no token paints an opaque background over our diff highlight layer
-        // and synchronize all token fonts with the configured editorFont face & size
+        // and synchronize all token fonts with the configured editorFont face & size using composite fonts
+        val spec = DiffThemeManager.fontSpec.value
         for (i in 0 until scheme.styleCount) {
             val style = scheme.getStyle(i) ?: continue
             style.background = null
             style.font = if (style.font != null && style.font.style != java.awt.Font.PLAIN) {
-                baseFont.deriveFont(style.font.style)
+                DiffThemeManager.createCompositeFont(spec.family, style.font.style, spec.size)
             } else {
                 baseFont
             }

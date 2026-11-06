@@ -50,6 +50,10 @@ whitespace = "default"
 [font]
 family = "Ioskeley Mono"
 size = 14
+
+[ui.font]
+family = "Inter"
+size = 13
 ```
 
 | TOML Key | CLI Flag(s) | Values / Type |
@@ -57,12 +61,14 @@ size = 14
 | `theme` | `--theme` | `"dark"` \| `"light"` |
 | `unified` | `-u`, `--unified` / `--no-unified` | `true` \| `false` |
 | `whitespace` | `-w`, `--whitespace` | `"default"` \| `"trim"` \| `"ignore"` |
-| `[font] family` | `--font-family` | Font family string |
-| `[font] size` | `--font-size` | Integer (`8..48`) |
+| `[font] family` | `--font-family` | Editor font family string |
+| `[font] size` | `--font-size` | Editor font size (`8..48`) |
+| `[ui.font] family` | `--ui-font-family` | UI chrome font family string |
+| `[ui.font] size` | `--ui-font-size` | UI chrome font size (`8..48`) |
 
-You can override any setting from the CLI or via the **Font: …** button in the top toolbar:
+You can override any setting from the CLI or via the **Fonts: …** button in the top toolbar:
 ```bash
-./ijdiff --font-family="Ioskeley Mono" --font-size=15 path/to/Left.kt path/to/Right.kt
+./ijdiff --font-family="Ioskeley Mono" --font-size=15 --ui-font-family="Inter" --ui-font-size=13 path/to/Left.kt path/to/Right.kt
 ```
 
 ### Use as `git difftool` (including `git difftool --dir-diff`)

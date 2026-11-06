@@ -18,11 +18,17 @@ import kotlin.io.path.isRegularFile
  * [font]
  * family = "JetBrains Mono"
  * size = 13
+ *
+ * [ui.font]
+ * family = "Inter"
+ * size = 13
  * ```
  */
 data class IjDiffConfig(
     val fontFamily: String? = null,
     val fontSize: Int = DEFAULT_FONT_SIZE,
+    val uiFontFamily: String? = null,
+    val uiFontSize: Int = DEFAULT_UI_FONT_SIZE,
     val theme: String? = null,
     val unified: Boolean = false,
     val whitespace: String = "default",
@@ -36,6 +42,7 @@ data class IjDiffConfig(
 
     companion object {
         const val DEFAULT_FONT_SIZE = 13
+        const val DEFAULT_UI_FONT_SIZE = 13
         const val MIN_FONT_SIZE = 8
         const val MAX_FONT_SIZE = 48
 
@@ -84,8 +91,8 @@ data class IjDiffConfig(
         }
 
         /**
-         * Parses TOML configuration content, supporting `[font]` and `[ui]` tables as well as
-         * dotted keys (`font.family`, `font.size`) and top-level keys (`theme`, `unified`, `whitespace`).
+         * Parses TOML configuration content, supporting `[font]` and `[ui.font]` tables as well as
+         * dotted keys (`font.family`, `font.size`, `ui.font.family`, `ui.font.size`) and top-level keys.
          */
         fun parse(content: String, sourcePath: Path? = null): IjDiffConfig {
             val entries = parseTomlEntries(content)
@@ -112,6 +119,27 @@ data class IjDiffConfig(
                 "font_size"
             )?.toIntOrNull()
             val size = (rawSize ?: DEFAULT_FONT_SIZE).coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)
+
+            val uiFamily = lookup(
+                "ui.font.family",
+                "ui.font.face",
+                "ui_font.family",
+                "ui_font.face",
+                "ui.font_family",
+                "ui.font_face",
+                "font.ui_family",
+                "font.ui_face",
+                "ui_font_family"
+            )
+            val rawUiSize = lookup(
+                "ui.font.size",
+                "ui_font.size",
+                "ui.font_size",
+                "font.ui_size",
+                "ui_font_size"
+            )?.toIntOrNull()
+            val uiSize = (rawUiSize ?: DEFAULT_UI_FONT_SIZE).coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)
+
             val theme = lookup("theme", "ui.theme", "appearance.theme")
             val unified = lookup("unified", "diff.unified")?.toBooleanStrictOrNull() ?: false
             val whitespace = lookup("whitespace", "diff.whitespace")?.lowercase() ?: "default"
@@ -119,6 +147,8 @@ data class IjDiffConfig(
             return IjDiffConfig(
                 fontFamily = family,
                 fontSize = size,
+                uiFontFamily = uiFamily,
+                uiFontSize = uiSize,
                 theme = theme,
                 unified = unified,
                 whitespace = whitespace,
@@ -153,6 +183,14 @@ data class IjDiffConfig(
                 appendLine("# family = \"JetBrains Mono\"")
             }
             appendLine("size = ${config.fontSize.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)}")
+            appendLine()
+            appendLine("[ui.font]")
+            if (!config.uiFontFamily.isNullOrBlank()) {
+                appendLine("family = ${quoteTomlString(config.uiFontFamily)}")
+            } else {
+                appendLine("# family = \"Inter\"")
+            }
+            appendLine("size = ${config.uiFontSize.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)}")
         }
 
         private fun quoteTomlString(value: String): String {

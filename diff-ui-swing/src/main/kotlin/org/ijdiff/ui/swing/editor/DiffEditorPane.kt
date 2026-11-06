@@ -5,6 +5,7 @@ import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.ijdiff.core.TextDiffType
 import org.ijdiff.core.getDiffType
 import org.ijdiff.model.document.DiffDocument
+import org.ijdiff.ui.swing.theme.DiffIcons
 import org.ijdiff.ui.swing.theme.DiffThemeManager
 import java.awt.BasicStroke
 import java.awt.BorderLayout
@@ -253,7 +254,7 @@ class DiffEditorPane(
                         hoveredFragmentIndex = idx
                         cursor = if (idx >= 0) Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) else Cursor.getDefaultCursor()
                         toolTipText = if (idx >= 0) {
-                            val dirText = if (side == EditorSide.LEFT) "Accept Left → Right" else "Accept Right ← Left"
+                            val dirText = if (side == EditorSide.LEFT) "Accept Left -> Right" else "Accept Right <- Left"
                             "$dirText (Ctrl+Click to Append)"
                         } else {
                             null
@@ -337,7 +338,7 @@ class DiffEditorPane(
                         g2.fillRect(0, y1.coerceAtLeast(1) - 1, width, 2)
                     }
 
-                    // Draw >> or << button on the first line of non-empty chunk if target is editable
+                    // Draw >> or << vector chevron button on the first line of non-empty chunk if target is editable
                     if (startLine < endLine && canTargetAcceptChunks()) {
                         val btnX = if (side == EditorSide.LEFT) width - actionColumnWidth else 2
                         val isHovered = (index == hoveredFragmentIndex)
@@ -345,13 +346,16 @@ class DiffEditorPane(
                             g2.color = palette.getWordBg(diffType)
                             g2.fillRoundRect(btnX, y1 + 1, actionColumnWidth - 2, lineHeight - 2, 4, 4)
                         }
-                        g2.font = DiffThemeManager.editorFont.deriveFont(java.awt.Font.BOLD, 11f)
-                        g2.color = if (isHovered) palette.editorFg else palette.getBorderColor(diffType).darker()
-                        val symbol = if (side == EditorSide.LEFT) "»" else "«"
-                        val fm = g2.fontMetrics
-                        val textY = y1 + (lineHeight + fm.ascent - fm.descent) / 2 - 1
-                        val textX = btnX + (actionColumnWidth - 2 - fm.stringWidth(symbol)) / 2
-                        g2.drawString(symbol, textX, textY)
+                        val arrowColor = if (isHovered) palette.editorFg else palette.getBorderColor(diffType).darker()
+                        DiffIcons.paintDoubleChevron(
+                            g2 = g2,
+                            x = btnX,
+                            y = y1 + 1,
+                            width = actionColumnWidth - 2,
+                            height = lineHeight - 2,
+                            pointRight = (side == EditorSide.LEFT),
+                            color = arrowColor
+                        )
                     }
                 }
 

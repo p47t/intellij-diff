@@ -147,10 +147,16 @@ class DiffModelTest {
             [font]
             family = "Ioskeley Mono"
             size = 16
+
+            [ui.font]
+            family = "Inter"
+            size = 14
             """.trimIndent()
         )
         assertEquals("Ioskeley Mono", parsed1.fontFamily)
         assertEquals(16, parsed1.fontSize)
+        assertEquals("Inter", parsed1.uiFontFamily)
+        assertEquals(14, parsed1.uiFontSize)
         assertEquals("light", parsed1.theme)
         assertTrue(parsed1.unified)
         assertEquals("ignore", parsed1.whitespace)
@@ -166,6 +172,7 @@ class DiffModelTest {
         )
         assertEquals("Fira Code", parsed2.fontFamily)
         assertEquals(IjDiffConfig.MAX_FONT_SIZE, parsed2.fontSize)
+        assertEquals(IjDiffConfig.DEFAULT_UI_FONT_SIZE, parsed2.uiFontSize)
         assertFalse(parsed2.unified)
         assertEquals("default", parsed2.whitespace)
         assertEquals(ComparisonPolicy.DEFAULT, parsed2.resolveComparisonPolicy())
@@ -179,10 +186,15 @@ class DiffModelTest {
         assertTrue(tomlText.contains("[font]"))
         assertTrue(tomlText.contains("family = \"Ioskeley Mono\""))
         assertTrue(tomlText.contains("size = 16"))
+        assertTrue(tomlText.contains("[ui.font]"))
+        assertTrue(tomlText.contains("family = \"Inter\""))
+        assertTrue(tomlText.contains("size = 14"))
 
         val reloaded = IjDiffConfig.load(configFile)
         assertEquals("Ioskeley Mono", reloaded.fontFamily)
         assertEquals(16, reloaded.fontSize)
+        assertEquals("Inter", reloaded.uiFontFamily)
+        assertEquals(14, reloaded.uiFontSize)
         assertEquals("light", reloaded.theme)
         assertTrue(reloaded.unified)
         assertEquals("ignore", reloaded.whitespace)

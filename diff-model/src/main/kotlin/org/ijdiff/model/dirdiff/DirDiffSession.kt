@@ -32,11 +32,11 @@ enum class DirDiffStatus(val symbol: String, val displayName: String) {
 }
 
 enum class DirSyncAction(val symbol: String, val description: String) {
-    COPY_TO_RIGHT("→", "Copy Left to Right"),
-    COPY_TO_LEFT("←", "Copy Right to Left"),
-    DELETE_LEFT("✕L", "Delete Left File"),
-    DELETE_RIGHT("✕R", "Delete Right File"),
-    SKIP("⊘", "Do Nothing")
+    COPY_TO_RIGHT(">>", "Copy Left to Right"),
+    COPY_TO_LEFT("<<", "Copy Right to Left"),
+    DELETE_LEFT("X L", "Delete Left File"),
+    DELETE_RIGHT("X R", "Delete Right File"),
+    SKIP("--", "Do Nothing")
 }
 
 data class FileMeta(

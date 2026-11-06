@@ -5,6 +5,7 @@ import org.ijdiff.model.dirdiff.DirDiffEntry
 import org.ijdiff.model.dirdiff.DirDiffSession
 import org.ijdiff.model.dirdiff.DirDiffStatus
 import org.ijdiff.model.dirdiff.DirSyncAction
+import org.ijdiff.ui.swing.theme.DiffIcons
 import org.ijdiff.ui.swing.theme.DiffThemeManager
 import org.ijdiff.ui.swing.twoway.TwoWayDiffPanel
 import java.awt.BorderLayout
@@ -73,11 +74,16 @@ class DirDiffMasterDetailPanel(
     }
 
     fun applyTheme() {
-        val baseFont = DiffThemeManager.editorFont
-        table.font = baseFont.deriveFont((baseFont.size - 1f).coerceAtLeast(11f))
-        table.rowHeight = (baseFont.size + 11).coerceAtLeast(22)
+        val baseUiFont = DiffThemeManager.uiFont
+        val boldUiFont = DiffThemeManager.uiBoldFont()
+        table.font = baseUiFont
+        table.tableHeader?.font = boldUiFont
+        table.rowHeight = (baseUiFont.size + 11).coerceAtLeast(22)
+        summaryLabel.font = boldUiFont
+        table.revalidate()
         table.repaint()
         currentDiffPanel?.applyTheme()
+        revalidate()
         repaint()
     }
 
@@ -90,7 +96,7 @@ class DirDiffMasterDetailPanel(
         toolbar.isFloatable = false
         toolbar.border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
 
-        val refreshBtn = JButton("⟳ Rescan").apply {
+        val refreshBtn = JButton("Rescan", DiffIcons.refresh()).apply {
             toolTipText = "Rescan Left and Right Directories"
             addActionListener {
                 if (currentDiffPanel?.confirmCloseOrSwitch(this@DirDiffMasterDetailPanel) == false) {
@@ -151,9 +157,10 @@ class DirDiffMasterDetailPanel(
             }
         }
 
+        val boldUiFont = DiffThemeManager.uiBoldFont()
         val syncAllBtn = JButton("Sync All").apply {
             toolTipText = "Execute Sync Action on All Filtered Rows"
-            font = font.deriveFont(Font.BOLD)
+            font = boldUiFont
             addActionListener {
                 val actionable = session.filteredEntries.value.filter { it.syncAction != DirSyncAction.SKIP }
                 if (actionable.isEmpty()) return@addActionListener
@@ -161,7 +168,7 @@ class DirDiffMasterDetailPanel(
             }
         }
 
-        summaryLabel.font = summaryLabel.font.deriveFont(Font.BOLD, 12f)
+        summaryLabel.font = boldUiFont
 
         toolbar.add(refreshBtn)
         toolbar.add(Box.createHorizontalStrut(6))
@@ -188,9 +195,11 @@ class DirDiffMasterDetailPanel(
     }
 
     private fun configureTable() {
-        table.rowHeight = 24
+        val baseUiFont = DiffThemeManager.uiFont
+        table.rowHeight = (baseUiFont.size + 11).coerceAtLeast(22)
         table.selectionModel.selectionMode = ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
-        table.font = DiffThemeManager.editorFont.deriveFont(12f)
+        table.font = baseUiFont
+        table.tableHeader?.font = DiffThemeManager.uiBoldFont()
         table.setShowGrid(false)
         table.intercellSpacing = Dimension(0, 1)
 
@@ -321,11 +330,11 @@ class DirDiffMasterDetailPanel(
             currentDiffPanel = null
             val msg = when {
                 selected == null -> "Select a file pair above to view its diff"
-                selected.isBinary -> "Binary file (${selected.relativePath}) — cannot display text diff"
+                selected.isBinary -> "Binary file (${selected.relativePath}) - cannot display text diff"
                 else -> "No preview available"
             }
             val emptyLabel = JLabel(msg, SwingConstants.CENTER).apply {
-                font = font.deriveFont(Font.ITALIC, 13f)
+                font = DiffThemeManager.uiItalicFont()
             }
             detailContainer.add(emptyLabel, BorderLayout.CENTER)
         }

@@ -9,6 +9,7 @@ import org.ijdiff.model.twoway.DiffViewMode
 import org.ijdiff.model.twoway.TwoWayDiffSession
 import org.ijdiff.ui.swing.dirdiff.DirDiffMasterDetailPanel
 import org.ijdiff.ui.swing.theme.AppTheme
+import org.ijdiff.ui.swing.theme.DiffIcons
 import org.ijdiff.ui.swing.theme.DiffThemeManager
 import org.ijdiff.ui.swing.twoway.TwoWayDiffPanel
 import java.awt.BorderLayout
@@ -104,7 +105,7 @@ class MainWindow(
             initialComparisonPolicy = policy,
             initialViewMode = viewMode
         )
-        val titleBase = "${leftPath.name} ↔ ${rightPath.name}"
+        val titleBase = "${leftPath.name} <-> ${rightPath.name}"
         var panel: TwoWayDiffPanel? = null
         val createdPanel = TwoWayDiffPanel(
             session = session,
@@ -121,8 +122,8 @@ class MainWindow(
     fun openDirectoryComparison(leftDir: Path, rightDir: Path) {
         val session = DirDiffSession(leftRoot = leftDir, rightRoot = rightDir)
         val panel = DirDiffMasterDetailPanel(session)
-        val title = "📁 ${leftDir.name} ↔ ${rightDir.name}"
-        addCloseableTab(title, panel)
+        val title = "${leftDir.name} <-> ${rightDir.name}"
+        addCloseableTab(title, panel, isDirectory = true)
     }
 
     fun openBlankScratchDiff(
@@ -171,10 +172,10 @@ class MainWindow(
         bar.isFloatable = false
         bar.border = BorderFactory.createEmptyBorder(6, 10, 6, 10)
 
-        val compareFilesBtn = JButton("Compare Files…").apply {
+        val compareFilesBtn = JButton("Compare Files...").apply {
             addActionListener { showCompareDialog(directories = false) }
         }
-        val compareDirsBtn = JButton("Compare Folders…").apply {
+        val compareDirsBtn = JButton("Compare Folders...").apply {
             addActionListener { showCompareDialog(directories = true) }
         }
         val scratchBtn = JButton("+ Scratch Diff").apply {
@@ -218,22 +219,37 @@ class MainWindow(
     }
 
     private fun updateFontButtonLabel() {
-        val spec = DiffThemeManager.fontSpec.value
-        fontStatusButton.text = "Font: ${spec.family} (${spec.size}pt)"
+        val editorSpec = DiffThemeManager.fontSpec.value
+        val uiSpec = DiffThemeManager.uiFontSpec.value
+        fontStatusButton.text = "Fonts: ${editorSpec.family} (${editorSpec.size}pt) | UI: ${uiSpec.family} (${uiSpec.size}pt)"
     }
 
     private fun showFontConfigDialog() {
-        val currentSpec = DiffThemeManager.fontSpec.value
+        val currentEditorSpec = DiffThemeManager.fontSpec.value
+        val currentUiSpec = DiffThemeManager.uiFontSpec.value
         val families = DiffThemeManager.getAvailableFontFamilies().ifEmpty {
-            listOf("JetBrains Mono", "Ioskeley Mono", "Fira Code", "Monospaced")
+            listOf("JetBrains Mono", "Ioskeley Mono", "Fira Code", "Inter", "Monospaced", "SansSerif")
         }
         val familyCombo = JComboBox(families.toTypedArray()).apply {
             isEditable = true
-            selectedItem = currentSpec.family
+            selectedItem = currentEditorSpec.family
         }
         val sizeSpinner = JSpinner(
             SpinnerNumberModel(
-                currentSpec.size,
+                currentEditorSpec.size,
+                IjDiffConfig.MIN_FONT_SIZE,
+                IjDiffConfig.MAX_FONT_SIZE,
+                1
+            )
+        )
+
+        val uiFamilyCombo = JComboBox(families.toTypedArray()).apply {
+            isEditable = true
+            selectedItem = currentUiSpec.family
+        }
+        val uiSizeSpinner = JSpinner(
+            SpinnerNumberModel(
+                currentUiSpec.size,
                 IjDiffConfig.MIN_FONT_SIZE,
                 IjDiffConfig.MAX_FONT_SIZE,
                 1
@@ -245,24 +261,34 @@ class MainWindow(
             insets = Insets(6, 6, 6, 6)
             fill = GridBagConstraints.HORIZONTAL
         }
-        gbc.gridx = 0; gbc.gridy = 0
-        panel.add(JLabel("Font Face ([font] family):"), gbc)
+        gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0.0
+        panel.add(JLabel("Editor Font Family ([font] family):"), gbc)
         gbc.gridx = 1; gbc.weightx = 1.0
         panel.add(familyCombo, gbc)
 
         gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0.0
-        panel.add(JLabel("Font Size ([font] size):"), gbc)
+        panel.add(JLabel("Editor Font Size ([font] size):"), gbc)
         gbc.gridx = 1; gbc.weightx = 1.0
         panel.add(sizeSpinner, gbc)
 
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2
+        gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0.0
+        panel.add(JLabel("UI Font Family ([ui.font] family):"), gbc)
+        gbc.gridx = 1; gbc.weightx = 1.0
+        panel.add(uiFamilyCombo, gbc)
+
+        gbc.gridx = 0; gbc.gridy = 3; gbc.weightx = 0.0
+        panel.add(JLabel("UI Font Size ([ui.font] size):"), gbc)
+        gbc.gridx = 1; gbc.weightx = 1.0
+        panel.add(uiSizeSpinner, gbc)
+
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2
         panel.add(JLabel("TOML Config File: $configPath"), gbc)
 
         val options = arrayOf("Apply & Save to Config", "Apply Only", "Cancel")
         val choice = JOptionPane.showOptionDialog(
             this,
             panel,
-            "Editor Font & Configuration",
+            "Editor & UI Font Configuration",
             JOptionPane.YES_NO_CANCEL_OPTION,
             JOptionPane.PLAIN_MESSAGE,
             null,
@@ -270,9 +296,12 @@ class MainWindow(
             options[0]
         )
         if (choice == 0 || choice == 1) {
-            val newFamily = familyCombo.selectedItem?.toString()?.trim()?.takeUnless { it.isEmpty() } ?: currentSpec.family
-            val newSize = (sizeSpinner.value as? Number)?.toInt() ?: currentSpec.size
+            val newFamily = familyCombo.selectedItem?.toString()?.trim()?.takeUnless { it.isEmpty() } ?: currentEditorSpec.family
+            val newSize = (sizeSpinner.value as? Number)?.toInt() ?: currentEditorSpec.size
+            val newUiFamily = uiFamilyCombo.selectedItem?.toString()?.trim()?.takeUnless { it.isEmpty() } ?: currentUiSpec.family
+            val newUiSize = (uiSizeSpinner.value as? Number)?.toInt() ?: currentUiSpec.size
             DiffThemeManager.setFont(newFamily, newSize)
+            DiffThemeManager.setUiFont(newUiFamily, newUiSize)
             updateFontButtonLabel()
             refreshAllTabThemes()
             if (choice == 0) {
@@ -280,6 +309,8 @@ class MainWindow(
                 val updatedConfig = existing.copy(
                     fontFamily = newFamily,
                     fontSize = newSize,
+                    uiFontFamily = newUiFamily,
+                    uiFontSize = newUiSize,
                     theme = if (DiffThemeManager.currentTheme.value.isDark) "dark" else "light",
                     sourcePath = configPath
                 )
@@ -310,8 +341,8 @@ class MainWindow(
             }
         }
 
-        val leftBrowse = JButton("Browse…").apply { addActionListener { browseInto(leftField) } }
-        val rightBrowse = JButton("Browse…").apply { addActionListener { browseInto(rightField) } }
+        val leftBrowse = JButton("Browse...").apply { addActionListener { browseInto(leftField) } }
+        val rightBrowse = JButton("Browse...").apply { addActionListener { browseInto(rightField) } }
 
         gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0.0
         dialogPanel.add(JLabel(if (directories) "Left Folder:" else "Left File:"), gbc)
@@ -340,7 +371,7 @@ class MainWindow(
             if (!p1.exists() || !p2.exists()) {
                 JOptionPane.showMessageDialog(
                     this,
-                    "Both paths must exist:\n• $p1\n• $p2",
+                    "Both paths must exist:\n- $p1\n- $p2",
                     "Path Not Found",
                     JOptionPane.ERROR_MESSAGE
                 )
@@ -350,10 +381,10 @@ class MainWindow(
         }
     }
 
-    private fun addCloseableTab(title: String, component: Component) {
+    private fun addCloseableTab(title: String, component: Component, isDirectory: Boolean = false) {
         tabbedPane.addTab(title, component)
         val idx = tabbedPane.indexOfComponent(component)
-        tabbedPane.setTabComponentAt(idx, createTabHeader(title, component))
+        tabbedPane.setTabComponentAt(idx, createTabHeader(title, component, isDirectory))
         tabbedPane.selectedComponent = component
     }
 
@@ -361,15 +392,20 @@ class MainWindow(
         val idx = tabbedPane.indexOfComponent(component)
         if (idx >= 0) {
             tabbedPane.setTitleAt(idx, newTitle)
-            tabbedPane.setTabComponentAt(idx, createTabHeader(newTitle, component))
+            tabbedPane.setTabComponentAt(idx, createTabHeader(newTitle, component, component is DirDiffMasterDetailPanel))
         }
     }
 
-    private fun createTabHeader(title: String, component: Component): JPanel {
+    private fun createTabHeader(title: String, component: Component, isDirectory: Boolean = false): JPanel {
         val header = JPanel(FlowLayout(FlowLayout.LEFT, 6, 0)).apply { isOpaque = false }
-        val label = JLabel(title).apply { font = font.deriveFont(Font.PLAIN, 12f) }
-        val closeBtn = JButton("×").apply {
-            margin = Insets(0, 4, 0, 4)
+        val label = JLabel(title).apply {
+            font = DiffThemeManager.uiFont
+            if (isDirectory) {
+                icon = DiffIcons.folder()
+            }
+        }
+        val closeBtn = JButton(DiffIcons.closeTab()).apply {
+            margin = Insets(2, 4, 2, 4)
             isBorderPainted = false
             isContentAreaFilled = false
             toolTipText = "Close Tab"
@@ -402,7 +438,10 @@ class MainWindow(
 
     private fun refreshAllTabThemes() {
         for (i in 0 until tabbedPane.tabCount) {
-            when (val comp = tabbedPane.getComponentAt(i)) {
+            val comp = tabbedPane.getComponentAt(i)
+            val title = tabbedPane.getTitleAt(i)
+            tabbedPane.setTabComponentAt(i, createTabHeader(title, comp, comp is DirDiffMasterDetailPanel))
+            when (comp) {
                 is TwoWayDiffPanel -> comp.applyTheme()
                 is DirDiffMasterDetailPanel -> comp.applyTheme()
             }

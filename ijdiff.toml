@@ -12,3 +12,10 @@ family = "JetBrains Mono"
 
 # Editor font size in pt, 8..48 (CLI: --font-size)
 size = 13
+
+[ui.font]
+# UI chrome font family for toolbars, tabs, tables, and dialogs (CLI: --ui-font-family)
+# family = "Inter"
+
+# UI chrome font size in pt, 8..48 (CLI: --ui-font-size)
+size = 13

@@ -38,6 +38,16 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
         help = "Editor font size in pt matching [font] size in ijdiff.toml (${IjDiffConfig.MIN_FONT_SIZE}..${IjDiffConfig.MAX_FONT_SIZE})"
     ).int()
 
+    private val uiFontFamily by option(
+        "--ui-font-family",
+        help = "UI chrome font family matching [ui.font] family in ijdiff.toml (e.g., 'Inter', 'Segoe UI')"
+    )
+
+    private val uiFontSize by option(
+        "--ui-font-size",
+        help = "UI chrome font size in pt matching [ui.font] size in ijdiff.toml (${IjDiffConfig.MIN_FONT_SIZE}..${IjDiffConfig.MAX_FONT_SIZE})"
+    ).int()
+
     private val unified by option(
         "-u", "--unified",
         help = "Open in Unified (single-pane) diff mode instead of Side-by-Side (matches unified in ijdiff.toml)"
@@ -103,6 +113,8 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
         val effectiveConfig = fileConfig.copy(
             fontFamily = fontFamily ?: fileConfig.fontFamily,
             fontSize = fontSize ?: fileConfig.fontSize,
+            uiFontFamily = uiFontFamily ?: fileConfig.uiFontFamily,
+            uiFontSize = uiFontSize ?: fileConfig.uiFontSize,
             theme = theme?.let { if (it.isDark) "dark" else "light" } ?: fileConfig.theme,
             unified = unified ?: fileConfig.unified,
             whitespace = whitespace ?: fileConfig.whitespace
