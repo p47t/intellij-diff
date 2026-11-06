@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "org.ijdiff"
-    version = "1.0.0"
+    version = providers.gradleProperty("releaseVersion").getOrElse("0.1.0")
 
     repositories {
         google()
