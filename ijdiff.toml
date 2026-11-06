@@ -1,0 +1,14 @@
+# ijdiff configuration file (TOML)
+# Placed in ./ijdiff.toml or ~/.config/ijdiff/config.toml
+# Every key corresponds 1-to-1 with a CLI option.
+
+theme = "dark"
+unified = false
+whitespace = "default"
+
+[font]
+# Editor font family (CLI: --font-family)
+family = "JetBrains Mono"
+
+# Editor font size in pt, 8..48 (CLI: --font-size)
+size = 13

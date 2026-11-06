@@ -134,37 +134,57 @@ class DiffModelTest {
     }
 
     @Test
-    fun `IjDiffConfig parses font family, font face alias, and font size and saves round-trip`(
+    fun `IjDiffConfig parses TOML font table, aliases, inline comments, and saves round-trip`(
         @TempDir tempDir: Path
     ) {
         val parsed1 = IjDiffConfig.parse(
             """
-            # Custom font config
-            font.family = "Ioskeley Mono"
-            font.size = 16
-            theme = light
+            # Custom TOML font config
+            theme = "light" # inline comment
+            unified = true
+            whitespace = "ignore"
+
+            [font]
+            family = "Ioskeley Mono"
+            size = 16
             """.trimIndent()
         )
         assertEquals("Ioskeley Mono", parsed1.fontFamily)
         assertEquals(16, parsed1.fontSize)
         assertEquals("light", parsed1.theme)
+        assertTrue(parsed1.unified)
+        assertEquals("ignore", parsed1.whitespace)
+        assertEquals(ComparisonPolicy.IGNORE_WHITESPACES, parsed1.resolveComparisonPolicy())
 
-        // Also supports font.face alias and bounds clamping
+        // Also supports [font] face alias, literal strings, and bounds clamping
         val parsed2 = IjDiffConfig.parse(
             """
-            font.face = Fira Code
-            font.size = 99
+            [font]
+            face = 'Fira Code'
+            size = 99
             """.trimIndent()
         )
         assertEquals("Fira Code", parsed2.fontFamily)
         assertEquals(IjDiffConfig.MAX_FONT_SIZE, parsed2.fontSize)
+        assertFalse(parsed2.unified)
+        assertEquals("default", parsed2.whitespace)
+        assertEquals(ComparisonPolicy.DEFAULT, parsed2.resolveComparisonPolicy())
 
-        // Round-trip save and load
-        val configFile = tempDir.resolve("ijdiff.conf")
+        // Round-trip save and load as TOML
+        val configFile = tempDir.resolve("ijdiff.toml")
         IjDiffConfig.save(parsed1, configFile)
+        val tomlText = Files.readString(configFile)
+        assertTrue(tomlText.contains("unified = true"))
+        assertTrue(tomlText.contains("whitespace = \"ignore\""))
+        assertTrue(tomlText.contains("[font]"))
+        assertTrue(tomlText.contains("family = \"Ioskeley Mono\""))
+        assertTrue(tomlText.contains("size = 16"))
+
         val reloaded = IjDiffConfig.load(configFile)
         assertEquals("Ioskeley Mono", reloaded.fontFamily)
         assertEquals(16, reloaded.fontSize)
         assertEquals("light", reloaded.theme)
+        assertTrue(reloaded.unified)
+        assertEquals("ignore", reloaded.whitespace)
     }
 }

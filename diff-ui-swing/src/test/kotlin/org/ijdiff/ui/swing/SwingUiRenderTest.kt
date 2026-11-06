@@ -95,8 +95,16 @@ class SwingUiRenderTest {
         val lightImage = layoutAndPaintOffscreen(panel, 1200, 700)
         assertTrue(lightImage.getRGB(600, 350) != 0)
 
-        // Apply custom font face and size from IjDiffConfig and verify editor fonts update
-        val customConfig = IjDiffConfig.parse("font.family = Monospaced\nfont.size = 18\ntheme = dark")
+        // Apply custom font face and size from TOML IjDiffConfig and verify editor fonts update
+        val customConfig = IjDiffConfig.parse(
+            """
+            theme = "dark"
+
+            [font]
+            family = "Monospaced"
+            size = 18
+            """.trimIndent()
+        )
         DiffThemeManager.applyConfig(customConfig)
         panel.applyTheme()
         assertEquals("Monospaced", panel.leftEditorPane.textArea.font.family)

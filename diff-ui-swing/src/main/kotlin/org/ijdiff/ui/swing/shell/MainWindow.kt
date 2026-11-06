@@ -246,17 +246,17 @@ class MainWindow(
             fill = GridBagConstraints.HORIZONTAL
         }
         gbc.gridx = 0; gbc.gridy = 0
-        panel.add(JLabel("Font Face (`font.family`):"), gbc)
+        panel.add(JLabel("Font Face ([font] family):"), gbc)
         gbc.gridx = 1; gbc.weightx = 1.0
         panel.add(familyCombo, gbc)
 
         gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0.0
-        panel.add(JLabel("Font Size (`font.size`):"), gbc)
+        panel.add(JLabel("Font Size ([font] size):"), gbc)
         gbc.gridx = 1; gbc.weightx = 1.0
         panel.add(sizeSpinner, gbc)
 
         gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2
-        panel.add(JLabel("Config File: $configPath"), gbc)
+        panel.add(JLabel("TOML Config File: $configPath"), gbc)
 
         val options = arrayOf("Apply & Save to Config", "Apply Only", "Cancel")
         val choice = JOptionPane.showOptionDialog(
@@ -276,7 +276,8 @@ class MainWindow(
             updateFontButtonLabel()
             refreshAllTabThemes()
             if (choice == 0) {
-                val updatedConfig = IjDiffConfig(
+                val existing = IjDiffConfig.load(configPath)
+                val updatedConfig = existing.copy(
                     fontFamily = newFamily,
                     fontSize = newSize,
                     theme = if (DiffThemeManager.currentTheme.value.isDark) "dark" else "light",

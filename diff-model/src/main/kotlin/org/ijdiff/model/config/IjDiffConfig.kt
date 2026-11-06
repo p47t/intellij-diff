@@ -1,22 +1,39 @@
 package org.ijdiff.model.config
 
-import java.io.StringReader
+import com.intellij.diff.comparison.ComparisonPolicy
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.Properties
 import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 
 /**
- * Application configuration model supporting font face (`font.family` / `font.face`),
- * font size (`font.size`), and optional UI defaults (`theme`).
+ * Application configuration model backed by TOML (`ijdiff.toml` / `~/.config/ijdiff/config.toml`).
+ *
+ * Canonical TOML format (1-to-1 with CLI flags):
+ * ```toml
+ * theme = "dark"
+ * unified = false
+ * whitespace = "default"
+ *
+ * [font]
+ * family = "JetBrains Mono"
+ * size = 13
+ * ```
  */
 data class IjDiffConfig(
     val fontFamily: String? = null,
     val fontSize: Int = DEFAULT_FONT_SIZE,
     val theme: String? = null,
+    val unified: Boolean = false,
+    val whitespace: String = "default",
     val sourcePath: Path? = null
 ) {
+    fun resolveComparisonPolicy(): ComparisonPolicy = when (whitespace.lowercase()) {
+        "trim", "trim_whitespaces" -> ComparisonPolicy.TRIM_WHITESPACES
+        "ignore", "ignore_whitespaces" -> ComparisonPolicy.IGNORE_WHITESPACES
+        else -> ComparisonPolicy.DEFAULT
+    }
+
     companion object {
         const val DEFAULT_FONT_SIZE = 13
         const val MIN_FONT_SIZE = 8
@@ -25,18 +42,18 @@ data class IjDiffConfig(
         val DEFAULT = IjDiffConfig()
 
         /**
-         * Resolves the default configuration file path using standard priority:
-         * 1. Explicit path if provided
-         * 2. `./ijdiff.conf` or `./.ijdiff.conf` in the working directory
-         * 3. `$XDG_CONFIG_HOME/ijdiff/ijdiff.conf` (or `~/.config/ijdiff/ijdiff.conf`)
-         * 4. `~/.ijdiff.conf`
+         * Resolves the configuration file path using standard priority:
+         * 1. Explicit path if provided (`--config <path>`)
+         * 2. `./ijdiff.toml` or `./.ijdiff.toml` in the working directory
+         * 3. `$XDG_CONFIG_HOME/ijdiff/config.toml` (or `~/.config/ijdiff/config.toml`)
+         * 4. `$XDG_CONFIG_HOME/ijdiff/ijdiff.toml` or `~/.ijdiff.toml`
          */
         fun resolveConfigPath(explicitPath: Path? = null, workingDir: Path = Path.of("")): Path {
             if (explicitPath != null) return explicitPath
 
             val localCandidates = listOf(
-                workingDir.resolve("ijdiff.conf"),
-                workingDir.resolve(".ijdiff.conf")
+                workingDir.resolve("ijdiff.toml"),
+                workingDir.resolve(".ijdiff.toml")
             )
             localCandidates.firstOrNull { it.exists() && it.isRegularFile() }?.let { return it }
 
@@ -45,18 +62,18 @@ data class IjDiffConfig(
                 ?: Path.of(System.getProperty("user.home", "."), ".config")
 
             val userCandidates = listOf(
-                xdgConfigHome.resolve("ijdiff").resolve("ijdiff.conf"),
-                xdgConfigHome.resolve("ijdiff").resolve("config.properties"),
-                Path.of(System.getProperty("user.home", "."), ".ijdiff.conf")
+                xdgConfigHome.resolve("ijdiff").resolve("config.toml"),
+                xdgConfigHome.resolve("ijdiff").resolve("ijdiff.toml"),
+                Path.of(System.getProperty("user.home", "."), ".ijdiff.toml")
             )
             userCandidates.firstOrNull { it.exists() && it.isRegularFile() }?.let { return it }
 
             // Default location for saving new user config
-            return xdgConfigHome.resolve("ijdiff").resolve("ijdiff.conf")
+            return xdgConfigHome.resolve("ijdiff").resolve("config.toml")
         }
 
         /**
-         * Loads configuration from [path] if it exists, or returns [DEFAULT] with [sourcePath] set to [path].
+         * Loads TOML configuration from [path] if it exists, or returns [DEFAULT] with [sourcePath] set to [path].
          */
         fun load(path: Path = resolveConfigPath()): IjDiffConfig {
             if (!path.exists() || !path.isRegularFile()) {
@@ -67,53 +84,171 @@ data class IjDiffConfig(
         }
 
         /**
-         * Parses configuration content (supports `font.family`, `font.face`, `editor.font.family`,
-         * `font.size`, `editor.font.size`, and `theme`).
+         * Parses TOML configuration content, supporting `[font]` and `[ui]` tables as well as
+         * dotted keys (`font.family`, `font.size`) and top-level keys (`theme`, `unified`, `whitespace`).
          */
         fun parse(content: String, sourcePath: Path? = null): IjDiffConfig {
-            val props = Properties()
-            props.load(StringReader(content))
+            val entries = parseTomlEntries(content)
 
-            fun getClean(vararg keys: String): String? {
+            fun lookup(vararg keys: String): String? {
                 for (k in keys) {
-                    val v = props.getProperty(k)?.trim()?.removeSurrounding("\"")?.removeSurrounding("'")?.trim()
-                    if (!v.isNullOrEmpty()) return v
+                    val v = entries[k]?.takeIf { it.isNotEmpty() }
+                    if (v != null) return v
                 }
                 return null
             }
 
-            val family = getClean("font.family", "font.face", "editor.font.family", "editor.font.face", "font_family", "font_face")
-            val rawSize = getClean("font.size", "editor.font.size", "font_size")?.toIntOrNull()
+            val family = lookup(
+                "font.family",
+                "font.face",
+                "editor.font.family",
+                "editor.font.face",
+                "font_family",
+                "font_face"
+            )
+            val rawSize = lookup(
+                "font.size",
+                "editor.font.size",
+                "font_size"
+            )?.toIntOrNull()
             val size = (rawSize ?: DEFAULT_FONT_SIZE).coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)
-            val theme = getClean("theme", "ui.theme")
+            val theme = lookup("theme", "ui.theme", "appearance.theme")
+            val unified = lookup("unified", "diff.unified")?.toBooleanStrictOrNull() ?: false
+            val whitespace = lookup("whitespace", "diff.whitespace")?.lowercase() ?: "default"
 
             return IjDiffConfig(
                 fontFamily = family,
                 fontSize = size,
                 theme = theme,
+                unified = unified,
+                whitespace = whitespace,
                 sourcePath = sourcePath
             )
         }
 
         /**
-         * Saves [config] to [targetPath] (or `config.sourcePath` / default user config path).
+         * Serializes [config] as TOML and writes it to [targetPath].
          */
         fun save(config: IjDiffConfig, targetPath: Path = config.sourcePath ?: resolveConfigPath()): Path {
             targetPath.parent?.let { Files.createDirectories(it) }
-            val content = buildString {
-                appendLine("# ijdiff configuration file")
-                if (!config.fontFamily.isNullOrBlank()) {
-                    appendLine("font.family = ${config.fontFamily}")
-                } else {
-                    appendLine("# font.family = JetBrains Mono")
-                }
-                appendLine("font.size = ${config.fontSize.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)}")
-                if (!config.theme.isNullOrBlank()) {
-                    appendLine("theme = ${config.theme}")
-                }
-            }
+            val content = toTomlString(config)
             Files.writeString(targetPath, content)
             return targetPath
+        }
+
+        fun toTomlString(config: IjDiffConfig): String = buildString {
+            appendLine("# ijdiff configuration file (TOML)")
+            if (!config.theme.isNullOrBlank()) {
+                appendLine("theme = ${quoteTomlString(config.theme)}")
+            } else {
+                appendLine("theme = \"dark\"")
+            }
+            appendLine("unified = ${config.unified}")
+            appendLine("whitespace = ${quoteTomlString(config.whitespace)}")
+            appendLine()
+            appendLine("[font]")
+            if (!config.fontFamily.isNullOrBlank()) {
+                appendLine("family = ${quoteTomlString(config.fontFamily)}")
+            } else {
+                appendLine("# family = \"JetBrains Mono\"")
+            }
+            appendLine("size = ${config.fontSize.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)}")
+        }
+
+        private fun quoteTomlString(value: String): String {
+            val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+            return "\"$escaped\""
+        }
+
+        /**
+         * Lightweight TOML parser handling `[section]` headers, dotted keys, basic/literal strings,
+         * integers/booleans, and `#` comments outside quotes.
+         */
+        private fun parseTomlEntries(toml: String): Map<String, String> {
+            val map = linkedMapOf<String, String>()
+            var currentTable = ""
+
+            for (rawLine in toml.lineSequence()) {
+                val line = stripTomlComment(rawLine).trim()
+                if (line.isEmpty()) continue
+
+                if (line.startsWith("[") && line.endsWith("]")) {
+                    currentTable = line.removeSurrounding("[", "]").trim()
+                    continue
+                }
+
+                val eqIndex = findTopLevelEquals(line)
+                if (eqIndex <= 0) continue
+
+                val rawKey = line.substring(0, eqIndex).trim()
+                val rawValue = line.substring(eqIndex + 1).trim()
+                if (rawKey.isEmpty() || rawValue.isEmpty()) continue
+
+                val normalizedKey = rawKey
+                    .split('.')
+                    .joinToString(".") { it.trim().removeSurrounding("\"").removeSurrounding("'") }
+
+                val fullKey = if (currentTable.isEmpty()) {
+                    normalizedKey
+                } else {
+                    "$currentTable.$normalizedKey"
+                }
+
+                map[fullKey] = unquoteTomlValue(rawValue)
+            }
+            return map
+        }
+
+        private fun stripTomlComment(line: String): String {
+            var inDoubleQuote = false
+            var inSingleQuote = false
+            var escaped = false
+
+            for (i in line.indices) {
+                val c = line[i]
+                if (escaped) {
+                    escaped = false
+                    continue
+                }
+                if (c == '\\' && inDoubleQuote) {
+                    escaped = true
+                    continue
+                }
+                if (c == '"' && !inSingleQuote) {
+                    inDoubleQuote = !inDoubleQuote
+                } else if (c == '\'' && !inDoubleQuote) {
+                    inSingleQuote = !inSingleQuote
+                } else if (c == '#' && !inDoubleQuote && !inSingleQuote) {
+                    return line.substring(0, i)
+                }
+            }
+            return line
+        }
+
+        private fun findTopLevelEquals(line: String): Int {
+            var inDoubleQuote = false
+            var inSingleQuote = false
+            for (i in line.indices) {
+                when (val c = line[i]) {
+                    '"' -> if (!inSingleQuote) inDoubleQuote = !inDoubleQuote
+                    '\'' -> if (!inDoubleQuote) inSingleQuote = !inSingleQuote
+                    '=' -> if (!inDoubleQuote && !inSingleQuote) return i
+                }
+            }
+            return -1
+        }
+
+        private fun unquoteTomlValue(raw: String): String {
+            if (raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')) {
+                return raw.substring(1, raw.length - 1)
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\")
+                    .trim()
+            }
+            if (raw.length >= 2 && raw.startsWith('\'') && raw.endsWith('\'')) {
+                return raw.substring(1, raw.length - 1).trim()
+            }
+            return raw.trim()
         }
     }
 }

@@ -4,12 +4,11 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
-import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.nullableFlag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
-import com.intellij.diff.comparison.ComparisonPolicy
 import org.ijdiff.model.config.IjDiffConfig
 import org.ijdiff.model.twoway.DiffViewMode
 import org.ijdiff.ui.swing.shell.MainWindow
@@ -26,36 +25,36 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
 
     private val configFile by option(
         "-c", "--config",
-        help = "Path to config file (defaults to ./ijdiff.conf or ~/.config/ijdiff/ijdiff.conf)"
+        help = "Path to TOML config file (defaults to ./ijdiff.toml or ~/.config/ijdiff/config.toml)"
     )
 
     private val fontFamily by option(
-        "--font-family", "--font-face",
-        help = "Override editor font family/face from config file (e.g., 'JetBrains Mono', 'Ioskeley Mono')"
+        "--font-family",
+        help = "Editor font family matching [font] family in ijdiff.toml (e.g., 'JetBrains Mono', 'Ioskeley Mono')"
     )
 
     private val fontSize by option(
         "--font-size",
-        help = "Override editor font size in pt (${IjDiffConfig.MIN_FONT_SIZE}..${IjDiffConfig.MAX_FONT_SIZE})"
+        help = "Editor font size in pt matching [font] size in ijdiff.toml (${IjDiffConfig.MIN_FONT_SIZE}..${IjDiffConfig.MAX_FONT_SIZE})"
     ).int()
 
     private val unified by option(
         "-u", "--unified",
-        help = "Open in Unified (single-pane) diff mode instead of Side-by-Side"
-    ).flag(default = false)
+        help = "Open in Unified (single-pane) diff mode instead of Side-by-Side (matches unified in ijdiff.toml)"
+    ).nullableFlag("--no-unified")
 
     private val whitespace by option(
         "-w", "--whitespace",
-        help = "Whitespace comparison policy: default, trim, or ignore"
+        help = "Whitespace comparison policy: default, trim, or ignore (matches whitespace in ijdiff.toml)"
     ).choice(
-        "default" to ComparisonPolicy.DEFAULT,
-        "trim" to ComparisonPolicy.TRIM_WHITESPACES,
-        "ignore" to ComparisonPolicy.IGNORE_WHITESPACES
-    ).default(ComparisonPolicy.DEFAULT)
+        "default" to "default",
+        "trim" to "trim",
+        "ignore" to "ignore"
+    )
 
     private val theme by option(
         "--theme",
-        help = "UI color theme: dark (Darcula) or light (IntelliJ Light)"
+        help = "UI color theme: dark (Darcula) or light (IntelliJ Light) (matches theme in ijdiff.toml)"
     ).choice(
         "dark" to AppTheme.DARK,
         "light" to AppTheme.LIGHT
@@ -104,20 +103,23 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
         val effectiveConfig = fileConfig.copy(
             fontFamily = fontFamily ?: fileConfig.fontFamily,
             fontSize = fontSize ?: fileConfig.fontSize,
-            theme = theme?.let { if (it.isDark) "dark" else "light" } ?: fileConfig.theme
+            theme = theme?.let { if (it.isDark) "dark" else "light" } ?: fileConfig.theme,
+            unified = unified ?: fileConfig.unified,
+            whitespace = whitespace ?: fileConfig.whitespace
         )
         val initialTheme = when (effectiveConfig.theme?.lowercase()) {
             "light" -> AppTheme.LIGHT
             else -> theme ?: AppTheme.DARK
         }
 
-        val viewMode = if (unified) DiffViewMode.UNIFIED else DiffViewMode.SIDE_BY_SIDE
+        val viewMode = if (effectiveConfig.unified) DiffViewMode.UNIFIED else DiffViewMode.SIDE_BY_SIDE
+        val policy = effectiveConfig.resolveComparisonPolicy()
         val closeLatch = CountDownLatch(1)
 
         SwingUtilities.invokeLater {
             DiffThemeManager.initialize(theme = initialTheme, config = effectiveConfig)
             val window = MainWindow(
-                defaultPolicy = whitespace,
+                defaultPolicy = policy,
                 defaultViewMode = viewMode,
                 configPath = resolvedConfigPath
             )

@@ -38,17 +38,29 @@
 ./ijdiff
 ```
 
-### Launch with Custom Config or Font
-`ijdiff` reads font face, font size, and theme settings from `./ijdiff.conf` or `~/.config/ijdiff/ijdiff.conf` (or via `--config <path>`):
+### Launch with Custom Config (`ijdiff.toml`) or CLI Flags
+`ijdiff` reads settings from `./ijdiff.toml` or `~/.config/ijdiff/config.toml` (or via `--config <path>`), with 1-to-1 matching CLI parameters:
 
-```ini
-# ijdiff.conf
-font.family = Ioskeley Mono
-font.size = 14
-theme = dark
+```toml
+# ijdiff.toml
+theme = "dark"
+unified = false
+whitespace = "default"
+
+[font]
+family = "Ioskeley Mono"
+size = 14
 ```
 
-You can also override the font face or size from the CLI or via the **Font: …** button in the top toolbar:
+| TOML Key | CLI Flag(s) | Values / Type |
+| :--- | :--- | :--- |
+| `theme` | `--theme` | `"dark"` \| `"light"` |
+| `unified` | `-u`, `--unified` / `--no-unified` | `true` \| `false` |
+| `whitespace` | `-w`, `--whitespace` | `"default"` \| `"trim"` \| `"ignore"` |
+| `[font] family` | `--font-family` | Font family string |
+| `[font] size` | `--font-size` | Integer (`8..48`) |
+
+You can override any setting from the CLI or via the **Font: …** button in the top toolbar:
 ```bash
 ./ijdiff --font-family="Ioskeley Mono" --font-size=15 path/to/Left.kt path/to/Right.kt
 ```
