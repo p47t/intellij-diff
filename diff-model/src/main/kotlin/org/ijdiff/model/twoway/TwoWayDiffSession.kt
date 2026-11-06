@@ -38,9 +38,13 @@ data class TwoWayDiffState(
     val rightText: String,
     val fragments: List<LineFragment>,
     val lineConvertor: LineNumberConvertor,
-    val unifiedResult: UnifiedFragmentBuilder.UnifiedDiffResult,
-    val currentFragmentIndex: Int
-)
+    val currentFragmentIndex: Int,
+    private val unifiedResultProvider: () -> UnifiedFragmentBuilder.UnifiedDiffResult
+) {
+    val unifiedResult: UnifiedFragmentBuilder.UnifiedDiffResult by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        unifiedResultProvider()
+    }
+}
 
 /**
  * UI-agnostic session controller for 2-way Side-by-Side and Unified text comparisons.
@@ -248,14 +252,6 @@ class TwoWayDiffSession(
         }
 
         val convertor = LineNumberConvertor.fromLineFragments(fragments, offsets1.lineCount, offsets2.lineCount)
-        val unified = UnifiedFragmentBuilder(
-            text1 = text1,
-            text2 = text2,
-            lineOffsets1 = offsets1,
-            lineOffsets2 = offsets2,
-            fragments = fragments
-        ).exec()
-
         val clampedIdx = if (fragments.isEmpty()) -1 else preferredFragmentIndex.coerceIn(0, fragments.lastIndex)
 
         return TwoWayDiffState(
@@ -263,8 +259,16 @@ class TwoWayDiffSession(
             rightText = text2,
             fragments = fragments,
             lineConvertor = convertor,
-            unifiedResult = unified,
-            currentFragmentIndex = clampedIdx
+            currentFragmentIndex = clampedIdx,
+            unifiedResultProvider = {
+                UnifiedFragmentBuilder(
+                    text1 = text1,
+                    text2 = text2,
+                    lineOffsets1 = offsets1,
+                    lineOffsets2 = offsets2,
+                    fragments = fragments
+                ).exec()
+            }
         )
     }
 }

@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -220,7 +220,6 @@ fun ComposeDirDiffView(
         }
 
         // Master Table (36% height)
-        val tableScroll = rememberScrollState()
         val rowHeightDp = (theme.uiFontSizePt + 11).coerceAtLeast(24).dp
 
         Column(
@@ -286,12 +285,10 @@ fun ComposeDirDiffView(
             }
 
             // Table Rows
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(tableScroll)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
             ) {
-                for (entry in filteredEntries) {
+                items(filteredEntries, key = { it.relativePath }) { entry ->
                     val isSelected = selectedEntry?.relativePath == entry.relativePath
                     val rowBg = when {
                         isSelected -> palette.accentBlue.copy(alpha = if (palette.isDark) 0.42f else 0.25f)

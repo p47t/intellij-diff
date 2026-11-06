@@ -53,7 +53,9 @@ class DirDiffMasterDetailPanel(
     private val splitPane: JSplitPane
 
     init {
-        session.scanSync()
+        if (session.allEntries.value.isEmpty()) {
+            session.scanSync()
+        }
 
         add(createToolbar(), BorderLayout.NORTH)
         configureTable()

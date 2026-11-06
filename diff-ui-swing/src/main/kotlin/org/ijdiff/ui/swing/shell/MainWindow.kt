@@ -105,7 +105,10 @@ class MainWindow(
             initialComparisonPolicy = policy,
             initialViewMode = viewMode
         )
-        val titleBase = "${leftPath.name} <-> ${rightPath.name}"
+        openFileSession("${leftPath.name} <-> ${rightPath.name}", session)
+    }
+
+    fun openFileSession(titleBase: String, session: TwoWayDiffSession) {
         var panel: TwoWayDiffPanel? = null
         val createdPanel = TwoWayDiffPanel(
             session = session,
@@ -121,8 +124,11 @@ class MainWindow(
 
     fun openDirectoryComparison(leftDir: Path, rightDir: Path) {
         val session = DirDiffSession(leftRoot = leftDir, rightRoot = rightDir)
+        openDirectorySession("${leftDir.name} <-> ${rightDir.name}", session)
+    }
+
+    fun openDirectorySession(title: String, session: DirDiffSession) {
         val panel = DirDiffMasterDetailPanel(session)
-        val title = "${leftDir.name} <-> ${rightDir.name}"
         addCloseableTab(title, panel, isDirectory = true)
     }
 

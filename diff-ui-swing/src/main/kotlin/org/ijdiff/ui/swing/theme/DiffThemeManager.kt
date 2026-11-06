@@ -122,35 +122,28 @@ object DiffThemeManager {
         }.getOrDefault(emptySet())
     }
 
-    private val defaultFontFamily: String by lazy {
-        val preferred = listOf("JetBrains Mono", "Ioskeley Mono", "Fira Code", "Consolas", Font.MONOSPACED)
-        preferred.firstOrNull { it in availableFontFamilies } ?: Font.MONOSPACED
-    }
-
-    private val defaultUiFontFamily: String by lazy {
-        val preferred = listOf("Inter", "Segoe UI", "SF Pro Text", "Ubuntu", "Noto Sans", "Cantarell", Font.SANS_SERIF)
-        preferred.firstOrNull { it in availableFontFamilies } ?: Font.SANS_SERIF
-    }
+    private const val DEFAULT_EDITOR_FAMILY = Font.MONOSPACED
+    private const val DEFAULT_UI_FAMILY = Font.SANS_SERIF
 
     private val _currentTheme = MutableStateFlow(AppTheme.DARK)
     val currentTheme: StateFlow<AppTheme> = _currentTheme.asStateFlow()
 
     private val _fontSpec = MutableStateFlow(
-        FontSpec(family = defaultFontFamily, size = IjDiffConfig.DEFAULT_FONT_SIZE)
+        FontSpec(family = DEFAULT_EDITOR_FAMILY, size = IjDiffConfig.DEFAULT_FONT_SIZE)
     )
     val fontSpec: StateFlow<FontSpec> = _fontSpec.asStateFlow()
 
     private val _uiFontSpec = MutableStateFlow(
-        FontSpec(family = defaultUiFontFamily, size = IjDiffConfig.DEFAULT_UI_FONT_SIZE)
+        FontSpec(family = DEFAULT_UI_FAMILY, size = IjDiffConfig.DEFAULT_UI_FONT_SIZE)
     )
     val uiFontSpec: StateFlow<FontSpec> = _uiFontSpec.asStateFlow()
 
     @Volatile
-    var editorFont: Font = createCompositeFont(defaultFontFamily, Font.PLAIN, IjDiffConfig.DEFAULT_FONT_SIZE)
+    var editorFont: Font = createCompositeFont(DEFAULT_EDITOR_FAMILY, Font.PLAIN, IjDiffConfig.DEFAULT_FONT_SIZE)
         private set
 
     @Volatile
-    var uiFont: Font = createCompositeFont(defaultUiFontFamily, Font.PLAIN, IjDiffConfig.DEFAULT_UI_FONT_SIZE)
+    var uiFont: Font = createCompositeFont(DEFAULT_UI_FAMILY, Font.PLAIN, IjDiffConfig.DEFAULT_UI_FONT_SIZE)
         private set
 
     val palette: DiffColorPalette

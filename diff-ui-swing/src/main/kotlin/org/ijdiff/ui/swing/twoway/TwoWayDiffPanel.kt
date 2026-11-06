@@ -92,9 +92,17 @@ class TwoWayDiffPanel(
         leftEditorPane.scrollToLine(targetLine)
     }
 
-    private val unifiedPane = UnifiedDiffPane(
-        fileTitle = session.rightDocument.title.ifBlank { session.leftDocument.title }
-    )
+    private var unifiedPane: UnifiedDiffPane? = null
+
+    private fun getOrCreateUnifiedPane(): UnifiedDiffPane {
+        unifiedPane?.let { return it }
+        val created = UnifiedDiffPane(
+            fileTitle = session.rightDocument.title.ifBlank { session.leftDocument.title }
+        )
+        unifiedPane = created
+        centerCards.add(created, DiffViewMode.UNIFIED.name)
+        return created
+    }
 
     private val cardLayout = CardLayout()
     private val centerCards = JPanel(cardLayout)
@@ -116,7 +124,6 @@ class TwoWayDiffPanel(
 
         val sideBySideContainer = createSideBySideContainer()
         centerCards.add(sideBySideContainer, DiffViewMode.SIDE_BY_SIDE.name)
-        centerCards.add(unifiedPane, DiffViewMode.UNIFIED.name)
         add(centerCards, BorderLayout.CENTER)
 
         setupSynchronizedScrolling()
@@ -137,7 +144,7 @@ class TwoWayDiffPanel(
         rightHeaderLabel.font = boldUi
         leftEditorPane.applyTheme()
         rightEditorPane.applyTheme()
-        unifiedPane.applyTheme()
+        unifiedPane?.applyTheme()
         dividerComponent.repaint()
         overviewBar.repaint()
         revalidate()
@@ -156,7 +163,9 @@ class TwoWayDiffPanel(
             st.fragments,
             max(session.leftDocument.lineCount, session.rightDocument.lineCount)
         )
-        unifiedPane.updateUnifiedResult(st.unifiedResult)
+        if (session.viewMode.value == DiffViewMode.UNIFIED) {
+            getOrCreateUnifiedPane().updateUnifiedResult(st.unifiedResult)
+        }
 
         cardLayout.show(centerCards, session.viewMode.value.name)
 
@@ -442,7 +451,7 @@ class TwoWayDiffPanel(
     fun scrollToFragment(fragment: LineFragment) {
         if (session.viewMode.value == DiffViewMode.UNIFIED) {
             val idx = session.state.value.fragments.indexOf(fragment)
-            if (idx >= 0) unifiedPane.scrollToUnifiedBlock(idx)
+            if (idx >= 0) getOrCreateUnifiedPane().scrollToUnifiedBlock(idx)
         } else {
             leftEditorPane.scrollToLine(fragment.startLine1)
         }

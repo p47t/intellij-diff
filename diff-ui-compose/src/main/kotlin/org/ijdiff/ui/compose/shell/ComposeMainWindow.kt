@@ -108,10 +108,14 @@ class ComposeShellController(
             initialComparisonPolicy = policy,
             initialViewMode = viewMode
         )
+        openFileSession("${leftPath.name} <-> ${rightPath.name}", session)
+    }
+
+    fun openFileSession(baseTitle: String, session: TwoWayDiffSession) {
         val id = "tab-${nextId++}"
         val tab = ComposeDiffTab.FileTab(
             id = id,
-            baseTitle = "${leftPath.name} <-> ${rightPath.name}",
+            baseTitle = baseTitle,
             session = session
         )
         tabs.add(tab)
@@ -121,10 +125,17 @@ class ComposeShellController(
     fun openDirectoryComparison(leftDir: Path, rightDir: Path) {
         val session = DirDiffSession(leftRoot = leftDir, rightRoot = rightDir)
         session.scanSync()
+        openDirectorySession("${leftDir.name} <-> ${rightDir.name}", session)
+    }
+
+    fun openDirectorySession(baseTitle: String, session: DirDiffSession) {
+        if (session.allEntries.value.isEmpty()) {
+            session.scanSync()
+        }
         val id = "tab-${nextId++}"
         val tab = ComposeDiffTab.DirectoryTab(
             id = id,
-            baseTitle = "${leftDir.name} <-> ${rightDir.name}",
+            baseTitle = baseTitle,
             session = session
         )
         tabs.add(tab)
@@ -669,12 +680,16 @@ fun launchComposeMainWindow(
     defaultViewMode: DiffViewMode,
     configPath: Path,
     loadSamples: Boolean,
-    paths: List<String>
+    paths: List<String>,
+    preloadFuture: java.util.concurrent.CompletableFuture<Pair<Pair<String, TwoWayDiffSession>?, Pair<String, DirDiffSession>?>>? = null
 ) = application {
     val themeState = remember {
         ComposeThemeState(initialTheme = initialTheme, initialConfig = config)
     }
     val controller = remember {
+        val preloaded = preloadFuture?.join()
+        val preloadedFileSession = preloaded?.first
+        val preloadedDirSession = preloaded?.second
         ComposeShellController(
             defaultPolicy = defaultPolicy,
             defaultViewMode = defaultViewMode,
@@ -682,6 +697,10 @@ fun launchComposeMainWindow(
         ).apply {
             if (loadSamples) {
                 loadAllBuiltInSamples()
+            } else if (preloadedFileSession != null) {
+                openFileSession(preloadedFileSession.first, preloadedFileSession.second)
+            } else if (preloadedDirSession != null) {
+                openDirectorySession(preloadedDirSession.first, preloadedDirSession.second)
             } else if (paths.size >= 2) {
                 val left = Path.of(paths[0]).toAbsolutePath().normalize()
                 val right = Path.of(paths[1]).toAbsolutePath().normalize()

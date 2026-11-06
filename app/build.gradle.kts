@@ -16,6 +16,7 @@ application {
     mainClass.set("org.ijdiff.app.MainKt")
     applicationName = "ijdiff"
     applicationDefaultJvmArgs = listOf(
+        "-XX:TieredStopAtLevel=1",
         "-Dapple.laf.useScreenMenuBar=true",
         "-Dapple.awt.application.name=ijdiff",
         "-Dapple.awt.application.appearance=system"

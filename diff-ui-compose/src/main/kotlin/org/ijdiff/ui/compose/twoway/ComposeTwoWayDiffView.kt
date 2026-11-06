@@ -1,7 +1,6 @@
 package org.ijdiff.ui.compose.twoway
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -100,45 +103,50 @@ fun ComposeTwoWayDiffView(
     var editMode by remember { mutableStateOf(false) }
     var appendChunksMode by remember { mutableStateOf(false) }
 
-    val leftScroll = rememberScrollState()
-    val rightScroll = rememberScrollState()
-    val unifiedScroll = rememberScrollState()
+    val leftListState = rememberLazyListState()
+    val rightListState = rememberLazyListState()
+    val unifiedListState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
     val lineHeightDp: Dp = (theme.editorFontSizePt + 7).dp
     val density = LocalDensity.current
     val lineHeightPx = with(density) { lineHeightDp.toPx().coerceAtLeast(16f) }
 
+    val leftScrollPx = leftListState.firstVisibleItemIndex * lineHeightPx + leftListState.firstVisibleItemScrollOffset
+    val rightScrollPx = rightListState.firstVisibleItemIndex * lineHeightPx + rightListState.firstVisibleItemScrollOffset
+
     // Synchronize left -> right scroll via LineNumberConvertor
     var syncingFromLeft by remember { mutableStateOf(false) }
     var syncingFromRight by remember { mutableStateOf(false) }
 
-    LaunchedEffect(leftScroll.value) {
+    LaunchedEffect(leftListState.firstVisibleItemIndex, leftListState.firstVisibleItemScrollOffset) {
         if (syncingFromRight) return@LaunchedEffect
         syncingFromLeft = true
         try {
-            val anchorLine1 = (leftScroll.value / lineHeightPx).toInt()
-            val subLineOffset = leftScroll.value % lineHeightPx
-            val anchorLine2 = state.lineConvertor.convertApproximate1(anchorLine1)
-            val targetPx = (anchorLine2 * lineHeightPx + subLineOffset).toInt().coerceAtLeast(0)
-            if (kotlin.math.abs(rightScroll.value - targetPx) > 2) {
-                rightScroll.scrollTo(targetPx)
+            val anchorLine1 = leftListState.firstVisibleItemIndex
+            val subLineOffset = leftListState.firstVisibleItemScrollOffset
+            val anchorLine2 = state.lineConvertor.convertApproximate1(anchorLine1).coerceAtLeast(0)
+            if (rightListState.firstVisibleItemIndex != anchorLine2 ||
+                kotlin.math.abs(rightListState.firstVisibleItemScrollOffset - subLineOffset) > 2
+            ) {
+                rightListState.scrollToItem(anchorLine2, subLineOffset)
             }
         } finally {
             syncingFromLeft = false
         }
     }
 
-    LaunchedEffect(rightScroll.value) {
+    LaunchedEffect(rightListState.firstVisibleItemIndex, rightListState.firstVisibleItemScrollOffset) {
         if (syncingFromLeft) return@LaunchedEffect
         syncingFromRight = true
         try {
-            val anchorLine2 = (rightScroll.value / lineHeightPx).toInt()
-            val subLineOffset = rightScroll.value % lineHeightPx
-            val anchorLine1 = state.lineConvertor.convertApproximateInv1(anchorLine2)
-            val targetPx = (anchorLine1 * lineHeightPx + subLineOffset).toInt().coerceAtLeast(0)
-            if (kotlin.math.abs(leftScroll.value - targetPx) > 2) {
-                leftScroll.scrollTo(targetPx)
+            val anchorLine2 = rightListState.firstVisibleItemIndex
+            val subLineOffset = rightListState.firstVisibleItemScrollOffset
+            val anchorLine1 = state.lineConvertor.convertApproximateInv1(anchorLine2).coerceAtLeast(0)
+            if (leftListState.firstVisibleItemIndex != anchorLine1 ||
+                kotlin.math.abs(leftListState.firstVisibleItemScrollOffset - subLineOffset) > 2
+            ) {
+                leftListState.scrollToItem(anchorLine1, subLineOffset)
             }
         } finally {
             syncingFromRight = false
@@ -147,12 +155,11 @@ fun ComposeTwoWayDiffView(
 
     fun scrollToFragment(fragment: LineFragment) {
         scope.launch {
-            val targetLine = fragment.startLine1
-            val targetY = ((targetLine - 3).coerceAtLeast(0) * lineHeightPx).toInt()
+            val targetLine = (fragment.startLine1 - 3).coerceAtLeast(0)
             if (viewMode == DiffViewMode.UNIFIED) {
-                unifiedScroll.animateScrollTo(targetY)
+                unifiedListState.animateScrollToItem(targetLine)
             } else {
-                leftScroll.animateScrollTo(targetY)
+                leftListState.animateScrollToItem(targetLine)
             }
         }
     }
@@ -301,7 +308,7 @@ fun ComposeTwoWayDiffView(
         if (viewMode == DiffViewMode.UNIFIED) {
             ComposeUnifiedDiffPane(
                 unifiedResult = state.unifiedResult,
-                scrollState = unifiedScroll,
+                listState = unifiedListState,
                 lineHeightDp = lineHeightDp
             )
         } else {
@@ -353,7 +360,7 @@ fun ComposeTwoWayDiffView(
                     document = session.leftDocument,
                     fragments = state.fragments,
                     activeFragmentIndex = state.currentFragmentIndex,
-                    scrollState = leftScroll,
+                    listState = leftListState,
                     lineHeightDp = lineHeightDp,
                     editMode = editMode,
                     canTargetAcceptChunks = !session.rightDocument.isReadOnly,
@@ -377,8 +384,8 @@ fun ComposeTwoWayDiffView(
                 ComposeBezierDividerCanvas(
                     session = session,
                     lineHeightPx = lineHeightPx,
-                    leftScrollPx = leftScroll.value.toFloat(),
-                    rightScrollPx = rightScroll.value.toFloat(),
+                    leftScrollPx = leftScrollPx,
+                    rightScrollPx = rightScrollPx,
                     onFragmentClicked = { idx ->
                         session.selectFragment(idx)?.let { scrollToFragment(it) }
                     },
@@ -390,7 +397,7 @@ fun ComposeTwoWayDiffView(
                     document = session.rightDocument,
                     fragments = state.fragments,
                     activeFragmentIndex = state.currentFragmentIndex,
-                    scrollState = rightScroll,
+                    listState = rightListState,
                     lineHeightDp = lineHeightDp,
                     editMode = editMode,
                     canTargetAcceptChunks = !session.leftDocument.isReadOnly,
@@ -416,8 +423,7 @@ fun ComposeTwoWayDiffView(
                     totalLines = max(session.leftDocument.lineCount, session.rightDocument.lineCount).coerceAtLeast(1),
                     onLineClicked = { targetLine ->
                         scope.launch {
-                            val targetY = ((targetLine - 3).coerceAtLeast(0) * lineHeightPx).toInt()
-                            leftScroll.animateScrollTo(targetY)
+                            leftListState.animateScrollToItem((targetLine - 3).coerceAtLeast(0))
                         }
                     },
                     modifier = Modifier.width(14.dp).fillMaxHeight()
@@ -433,7 +439,7 @@ private fun ComposeDiffSidePane(
     document: DiffDocument,
     fragments: List<LineFragment>,
     activeFragmentIndex: Int,
-    scrollState: ScrollState,
+    listState: LazyListState,
     lineHeightDp: Dp,
     editMode: Boolean,
     canTargetAcceptChunks: Boolean,
@@ -446,6 +452,7 @@ private fun ComposeDiffSidePane(
     val text by document.text.collectAsState()
     val lines = remember(text) { text.split('\n') }
     val horizontalScroll = rememberScrollState()
+    val editScroll = rememberScrollState()
 
     // Map each 0-based line to its containing fragment & inline highlight ranges
     data class LineFragmentInfo(
@@ -529,7 +536,7 @@ private fun ComposeDiffSidePane(
                 cursorBrush = SolidColor(palette.editorFg),
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
+                    .verticalScroll(editScroll)
                     .padding(horizontal = 12.dp, vertical = 4.dp)
             )
         } else {
@@ -537,12 +544,11 @@ private fun ComposeDiffSidePane(
             val gutterNumWidth = (gutterDigits * 9 + 14).dp
             val actionColWidth = 22.dp
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize()
             ) {
-                for ((lineIdx, lineStr) in lines.withIndex()) {
+                itemsIndexed(lines) { lineIdx, lineStr ->
                     val info = lineInfoMap[lineIdx]
                     val emptyMarkerType = emptyRangeMarkers[lineIdx]
                     val lineBg = info?.let { palette.getLineBg(it.diffType) } ?: palette.editorBg
@@ -835,7 +841,7 @@ private fun ComposeOverviewBarCanvas(
 @Composable
 private fun ComposeUnifiedDiffPane(
     unifiedResult: UnifiedFragmentBuilder.UnifiedDiffResult,
-    scrollState: ScrollState,
+    listState: LazyListState,
     lineHeightDp: Dp
 ) {
     val theme = LocalComposeThemeState.current
@@ -844,13 +850,13 @@ private fun ComposeUnifiedDiffPane(
     val horizontalScroll = rememberScrollState()
     val colWidth = 42.dp
 
-    Column(
+    LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .background(palette.editorBg)
-            .verticalScroll(scrollState)
     ) {
-        for ((uLine, lineStr) in lines.withIndex()) {
+        itemsIndexed(lines) { uLine, lineStr ->
             val mapping = unifiedResult.lineMappings.getOrNull(uLine)
             val diffType = mapping?.type
             val lineBg = diffType?.let { palette.getLineBg(it) } ?: palette.editorBg

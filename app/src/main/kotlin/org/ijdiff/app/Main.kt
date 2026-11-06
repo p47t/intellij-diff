@@ -10,7 +10,10 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
 import org.ijdiff.model.config.IjDiffConfig
+import org.ijdiff.model.dirdiff.DirDiffSession
+import org.ijdiff.model.document.DiffDocument
 import org.ijdiff.model.twoway.DiffViewMode
+import org.ijdiff.model.twoway.TwoWayDiffSession
 import org.ijdiff.ui.compose.shell.launchComposeMainWindow
 import org.ijdiff.ui.compose.theme.ComposeAppTheme
 import org.ijdiff.ui.swing.shell.MainWindow
@@ -19,9 +22,12 @@ import org.ijdiff.ui.swing.theme.DiffThemeManager
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import javax.swing.SwingUtilities
 import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
+import kotlin.io.path.name
 
 class IjDiffCli : CliktCommand(name = "ijdiff") {
 
@@ -138,6 +144,40 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
         val viewMode = if (effectiveConfig.unified) DiffViewMode.UNIFIED else DiffViewMode.SIDE_BY_SIDE
         val policy = effectiveConfig.resolveComparisonPolicy()
 
+        // Validate paths early and preload/compute diff on a background thread while the UI toolkit initializes
+        var preloadedPaths: Pair<Path, Path>? = null
+        if (!loadSamples && paths.size >= 2) {
+            val left = Path.of(paths[0]).toAbsolutePath().normalize()
+            val right = Path.of(paths[1]).toAbsolutePath().normalize()
+            if (!left.exists() || !right.exists()) {
+                System.err.println("Error: Both paths must exist:\n  left:  $left\n  right: $right")
+                return
+            }
+            preloadedPaths = left to right
+        }
+
+        val preloadFuture = preloadedPaths?.let { (left, right) ->
+            CompletableFuture.supplyAsync {
+                val title = "${left.name} <-> ${right.name}"
+                if (left.isDirectory() && right.isDirectory()) {
+                    val dirSession = DirDiffSession(leftRoot = left, rightRoot = right)
+                    dirSession.scanSync()
+                    null to (title to dirSession)
+                } else {
+                    val leftDocFuture = CompletableFuture.supplyAsync { DiffDocument.fromFile(left) }
+                    val rightDoc = DiffDocument.fromFile(right)
+                    val leftDoc = leftDocFuture.join()
+                    val fileSession = TwoWayDiffSession(
+                        leftDocument = leftDoc,
+                        rightDocument = rightDoc,
+                        initialComparisonPolicy = policy,
+                        initialViewMode = viewMode
+                    )
+                    (title to fileSession) to null
+                }
+            }
+        }
+
         if (effectiveConfig.ui.equals("compose", ignoreCase = true)) {
             val composeTheme = if (initialTheme.isDark) ComposeAppTheme.DARK else ComposeAppTheme.LIGHT
             launchComposeMainWindow(
@@ -147,7 +187,8 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
                 defaultViewMode = viewMode,
                 configPath = resolvedConfigPath,
                 loadSamples = loadSamples,
-                paths = paths
+                paths = paths,
+                preloadFuture = preloadFuture
             )
             return
         }
@@ -169,16 +210,13 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
 
             if (loadSamples) {
                 window.loadAllBuiltInSamples()
-            } else if (paths.size >= 2) {
-                val left = Path.of(paths[0]).toAbsolutePath().normalize()
-                val right = Path.of(paths[1]).toAbsolutePath().normalize()
-                if (!left.exists() || !right.exists()) {
-                    System.err.println("Error: Both paths must exist:\n  left:  $left\n  right: $right")
-                    window.dispose()
-                    closeLatch.countDown()
-                    return@invokeLater
+            } else if (preloadFuture != null) {
+                val (filePair, dirPair) = preloadFuture.join()
+                if (filePair != null) {
+                    window.openFileSession(filePair.first, filePair.second)
+                } else if (dirPair != null) {
+                    window.openDirectorySession(dirPair.first, dirPair.second)
                 }
-                window.openComparison(left, right)
             } else {
                 // Open with a sample scratch comparison when launched with no arguments
                 window.openBlankScratchDiff(
