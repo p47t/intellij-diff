@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -369,6 +370,7 @@ fun ComposeDirDiffView(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.64f)
+                .clipToBounds()
                 .background(palette.editorBg)
         ) {
             val activePreview = previewSession

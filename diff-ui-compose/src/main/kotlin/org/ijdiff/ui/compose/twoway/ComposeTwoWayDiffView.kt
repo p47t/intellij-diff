@@ -32,12 +32,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -158,6 +160,7 @@ fun ComposeTwoWayDiffView(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .clipToBounds()
             .background(palette.appBg)
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
@@ -344,7 +347,7 @@ fun ComposeTwoWayDiffView(
             }
 
             // 4-Column Side-by-Side Layout: Left Pane | Bezier Divider | Right Pane | Overview Bar
-            Row(modifier = Modifier.fillMaxSize()) {
+            Row(modifier = Modifier.fillMaxSize().clipToBounds()) {
                 ComposeDiffSidePane(
                     isLeft = true,
                     document = session.leftDocument,
@@ -701,9 +704,11 @@ private fun ComposeBezierDividerCanvas(
 
     Canvas(
         modifier = modifier
+            .clipToBounds()
             .background(palette.dividerBg)
             .pointerInput(state.fragments, lineHeightPx, leftScrollPx, rightScrollPx) {
                 detectTapGestures { tapOffset ->
+                    if (tapOffset.y !in 0f..size.height.toFloat()) return@detectTapGestures
                     val polygons = presentation.computeDividerPolygons(
                         dividerWidthPx = size.width.toFloat(),
                         lineHeightPx = lineHeightPx,
@@ -726,61 +731,63 @@ private fun ComposeBezierDividerCanvas(
         val w = size.width
         val h = size.height
 
-        val polygons = presentation.computeDividerPolygons(
-            dividerWidthPx = w,
-            lineHeightPx = lineHeightPx,
-            leftScrollYPx = leftScrollPx,
-            rightScrollYPx = rightScrollPx,
-            isDarkTheme = palette.isDark
-        )
+        clipRect(left = 0f, top = 0f, right = w, bottom = h) {
+            val polygons = presentation.computeDividerPolygons(
+                dividerWidthPx = w,
+                lineHeightPx = lineHeightPx,
+                leftScrollYPx = leftScrollPx,
+                rightScrollYPx = rightScrollPx,
+                isDarkTheme = palette.isDark
+            )
 
-        for (poly in polygons) {
-            val p = poly.polygon
-            if (maxOf(p.endY1, p.endY2) < 0f || minOf(p.startY1, p.startY2) > h) continue
+            for (poly in polygons) {
+                val p = poly.polygon
+                if (maxOf(p.endY1, p.endY2) < 0f || minOf(p.startY1, p.startY2) > h) continue
 
-            val path = Path().apply {
-                moveTo(0f, p.startY1)
-                cubicTo(
-                    p.topCurve.ctrl1X, p.topCurve.ctrl1Y,
-                    p.topCurve.ctrl2X, p.topCurve.ctrl2Y,
-                    p.topCurve.endX, p.topCurve.endY
-                )
-                lineTo(w, p.endY2)
-                cubicTo(
-                    p.bottomCurve.ctrl1X, p.bottomCurve.ctrl1Y,
-                    p.bottomCurve.ctrl2X, p.bottomCurve.ctrl2Y,
-                    p.bottomCurve.endX, p.bottomCurve.endY
-                )
-                close()
+                val path = Path().apply {
+                    moveTo(0f, p.startY1)
+                    cubicTo(
+                        p.topCurve.ctrl1X, p.topCurve.ctrl1Y,
+                        p.topCurve.ctrl2X, p.topCurve.ctrl2Y,
+                        p.topCurve.endX, p.topCurve.endY
+                    )
+                    lineTo(w, p.endY2)
+                    cubicTo(
+                        p.bottomCurve.ctrl1X, p.bottomCurve.ctrl1Y,
+                        p.bottomCurve.ctrl2X, p.bottomCurve.ctrl2Y,
+                        p.bottomCurve.endX, p.bottomCurve.endY
+                    )
+                    close()
+                }
+
+                drawPath(path, color = Color(poly.fillColor.argb))
+
+                val topStroke = Path().apply {
+                    moveTo(0f, p.startY1)
+                    cubicTo(
+                        p.topCurve.ctrl1X, p.topCurve.ctrl1Y,
+                        p.topCurve.ctrl2X, p.topCurve.ctrl2Y,
+                        p.topCurve.endX, p.topCurve.endY
+                    )
+                }
+                val bottomStroke = Path().apply {
+                    moveTo(w, p.endY2)
+                    cubicTo(
+                        p.bottomCurve.ctrl1X, p.bottomCurve.ctrl1Y,
+                        p.bottomCurve.ctrl2X, p.bottomCurve.ctrl2Y,
+                        p.bottomCurve.endX, p.bottomCurve.endY
+                    )
+                }
+                val strokeColor = if (poly.isSelected) palette.activeFragmentBorder else Color(poly.strokeColor.argb)
+                val strokeWidth = if (poly.isSelected) 2.0f else 1.1f
+                drawPath(topStroke, color = strokeColor, style = Stroke(width = strokeWidth))
+                drawPath(bottomStroke, color = strokeColor, style = Stroke(width = strokeWidth))
             }
 
-            drawPath(path, color = Color(poly.fillColor.argb))
-
-            val topStroke = Path().apply {
-                moveTo(0f, p.startY1)
-                cubicTo(
-                    p.topCurve.ctrl1X, p.topCurve.ctrl1Y,
-                    p.topCurve.ctrl2X, p.topCurve.ctrl2Y,
-                    p.topCurve.endX, p.topCurve.endY
-                )
-            }
-            val bottomStroke = Path().apply {
-                moveTo(w, p.endY2)
-                cubicTo(
-                    p.bottomCurve.ctrl1X, p.bottomCurve.ctrl1Y,
-                    p.bottomCurve.ctrl2X, p.bottomCurve.ctrl2Y,
-                    p.bottomCurve.endX, p.bottomCurve.endY
-                )
-            }
-            val strokeColor = if (poly.isSelected) palette.activeFragmentBorder else Color(poly.strokeColor.argb)
-            val strokeWidth = if (poly.isSelected) 2.0f else 1.1f
-            drawPath(topStroke, color = strokeColor, style = Stroke(width = strokeWidth))
-            drawPath(bottomStroke, color = strokeColor, style = Stroke(width = strokeWidth))
+            // Left and right border lines
+            drawLine(palette.gutterBorder, Offset(0f, 0f), Offset(0f, h), strokeWidth = 1f)
+            drawLine(palette.gutterBorder, Offset(w - 1f, 0f), Offset(w - 1f, h), strokeWidth = 1f)
         }
-
-        // Left and right border lines
-        drawLine(palette.gutterBorder, Offset(0f, 0f), Offset(0f, h), strokeWidth = 1f)
-        drawLine(palette.gutterBorder, Offset(w - 1f, 0f), Offset(w - 1f, h), strokeWidth = 1f)
     }
 }
 
@@ -794,6 +801,7 @@ private fun ComposeOverviewBarCanvas(
     val palette = LocalComposeThemeState.current.palette
     Canvas(
         modifier = modifier
+            .clipToBounds()
             .background(palette.gutterBg)
             .pointerInput(totalLines) {
                 detectTapGestures { offset ->
@@ -806,19 +814,21 @@ private fun ComposeOverviewBarCanvas(
     ) {
         val w = size.width
         val h = size.height
-        val denom = totalLines.coerceAtLeast(1).toFloat()
-        for (fragment in fragments) {
-            val type = fragment.getDiffType()
-            val y1 = (fragment.startLine1 / denom) * h
-            val y2 = ((fragment.endLine1.coerceAtLeast(fragment.startLine1 + 1)) / denom) * h
-            val barH = (y2 - y1).coerceAtLeast(3f)
-            drawRect(
-                color = palette.getBorderColor(type),
-                topLeft = Offset(2f, y1),
-                size = Size(w - 4f, barH)
-            )
+        clipRect(left = 0f, top = 0f, right = w, bottom = h) {
+            val denom = totalLines.coerceAtLeast(1).toFloat()
+            for (fragment in fragments) {
+                val type = fragment.getDiffType()
+                val y1 = (fragment.startLine1 / denom) * h
+                val y2 = ((fragment.endLine1.coerceAtLeast(fragment.startLine1 + 1)) / denom) * h
+                val barH = (y2 - y1).coerceAtLeast(3f)
+                drawRect(
+                    color = palette.getBorderColor(type),
+                    topLeft = Offset(2f, y1),
+                    size = Size(w - 4f, barH)
+                )
+            }
+            drawLine(palette.gutterBorder, Offset(0f, 0f), Offset(0f, h), strokeWidth = 1f)
         }
-        drawLine(palette.gutterBorder, Offset(0f, 0f), Offset(0f, h), strokeWidth = 1f)
     }
 }
 

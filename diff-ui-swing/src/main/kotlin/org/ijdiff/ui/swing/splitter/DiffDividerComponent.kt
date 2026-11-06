@@ -32,6 +32,7 @@ class DiffDividerComponent(
     private var activeFragmentIndex: Int = -1
 
     init {
+        isOpaque = true
         preferredSize = Dimension(36, 100)
         minimumSize = Dimension(32, 50)
 
@@ -58,6 +59,7 @@ class DiffDividerComponent(
     }
 
     private fun findPolygonAtY(y: Float): Int {
+        if (y !in 0f..height.toFloat()) return -1
         for ((index, fragment) in fragments.withIndex()) {
             val (sy1, ey1) = leftPane.getViewportYRange(fragment.startLine1, fragment.endLine1)
             val (sy2, ey2) = rightPane.getViewportYRange(fragment.startLine2, fragment.endLine2)
@@ -74,10 +76,23 @@ class DiffDividerComponent(
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             val palette = DiffThemeManager.palette
             val w = width.toFloat()
-            val h = height.toFloat()
 
+            g2.clipRect(0, 0, width, height)
             g2.color = palette.dividerBg
             g2.fillRect(0, 0, width, height)
+
+            // Subtle vertical side borders
+            g2.color = palette.gutterBorder
+            g2.stroke = BasicStroke(1f)
+            g2.drawLine(0, 0, 0, height)
+            g2.drawLine(width - 1, 0, width - 1, height)
+
+            val viewportHeight = max(
+                leftPane.scrollPane.viewport.height,
+                rightPane.scrollPane.viewport.height
+            ).takeIf { it > 0 }?.coerceAtMost(height) ?: height
+            val h = viewportHeight.toFloat()
+            g2.clipRect(0, 0, width, viewportHeight)
 
             for ((index, fragment) in fragments.withIndex()) {
                 val (sy1, ey1) = leftPane.getViewportYRange(fragment.startLine1, fragment.endLine1)
@@ -136,12 +151,6 @@ class DiffDividerComponent(
                 )
                 g2.draw(bottomEdge)
             }
-
-            // Subtle vertical side borders
-            g2.color = palette.gutterBorder
-            g2.stroke = BasicStroke(1f)
-            g2.drawLine(0, 0, 0, height)
-            g2.drawLine(width - 1, 0, width - 1, height)
         } finally {
             g2.dispose()
         }

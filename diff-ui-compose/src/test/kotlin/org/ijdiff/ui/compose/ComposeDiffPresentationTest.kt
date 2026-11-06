@@ -140,4 +140,31 @@ class ComposeDiffPresentationTest {
         assertTrue(Files.exists(outDir.resolve("compose-dir-01-master-detail.png")))
         assertTrue(Files.exists(outDir.resolve("compose-main-window-samples.png")))
     }
+
+    @Test
+    fun `ComposeDirDiffView and ComposeTwoWayDiffView clip center Bezier connection when scrolled down`() {
+        val leftLines = (1..80).joinToString("\n") { i ->
+            if (i in 2..15) "left_modified_line_$i" else "common_line_$i"
+        }
+        val rightLines = (1..80).joinToString("\n") { i ->
+            if (i in 2..25) "right_modified_line_$i" else "common_line_$i"
+        }
+        val session = TwoWayDiffSession(DiffDocument(leftLines), DiffDocument(rightLines))
+        val themeState = ComposeThemeState(initialTheme = ComposeAppTheme.DARK)
+
+        ImageComposeScene(width = 1000, height = 600).use { scene ->
+            scene.setContent {
+                ProvideComposeDiffTheme(themeState) {
+                    ComposeTwoWayDiffView(session = session)
+                }
+            }
+            // Jump to the first difference and then scroll down so the top of the fragment has negative Y
+            val firstFrag = session.state.value.fragments.first()
+            session.selectFragment(0)
+            assertNotNull(firstFrag)
+            val img = scene.render()
+            assertEquals(1000, img.width)
+            assertEquals(600, img.height)
+        }
+    }
 }
