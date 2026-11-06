@@ -30,6 +30,7 @@ data class IjDiffConfig(
     val uiFontFamily: String? = null,
     val uiFontSize: Int = DEFAULT_UI_FONT_SIZE,
     val theme: String? = null,
+    val ui: String = "swing",
     val unified: Boolean = false,
     val whitespace: String = "default",
     val sourcePath: Path? = null
@@ -141,6 +142,7 @@ data class IjDiffConfig(
             val uiSize = (rawUiSize ?: DEFAULT_UI_FONT_SIZE).coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE)
 
             val theme = lookup("theme", "ui.theme", "appearance.theme")
+            val uiToolkit = lookup("ui", "ui.toolkit", "toolkit")?.lowercase() ?: "swing"
             val unified = lookup("unified", "diff.unified")?.toBooleanStrictOrNull() ?: false
             val whitespace = lookup("whitespace", "diff.whitespace")?.lowercase() ?: "default"
 
@@ -150,6 +152,7 @@ data class IjDiffConfig(
                 uiFontFamily = uiFamily,
                 uiFontSize = uiSize,
                 theme = theme,
+                ui = uiToolkit,
                 unified = unified,
                 whitespace = whitespace,
                 sourcePath = sourcePath
@@ -168,6 +171,7 @@ data class IjDiffConfig(
 
         fun toTomlString(config: IjDiffConfig): String = buildString {
             appendLine("# ijdiff configuration file (TOML)")
+            appendLine("ui = ${quoteTomlString(config.ui)}")
             if (!config.theme.isNullOrBlank()) {
                 appendLine("theme = ${quoteTomlString(config.theme)}")
             } else {

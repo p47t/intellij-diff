@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     implementation(project(":diff-ui-swing"))
+    implementation(project(":diff-ui-compose"))
     implementation(libs.clikt)
     implementation(libs.kotlinx.coroutines.swing)
 }

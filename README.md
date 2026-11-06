@@ -43,6 +43,7 @@
 
 ```toml
 # ijdiff.toml
+ui = "swing" # or "compose"
 theme = "dark"
 unified = false
 whitespace = "default"
@@ -58,6 +59,7 @@ size = 13
 
 | TOML Key | CLI Flag(s) | Values / Type |
 | :--- | :--- | :--- |
+| `ui` | `--ui` | `"swing"` (Phase 1) \| `"compose"` (Phase 2 Compose Multiplatform) |
 | `theme` | `--theme` | `"dark"` \| `"light"` |
 | `unified` | `-u`, `--unified` / `--no-unified` | `true` \| `false` |
 | `whitespace` | `-w`, `--whitespace` | `"default"` \| `"trim"` \| `"ignore"` |
@@ -66,8 +68,12 @@ size = 13
 | `[ui.font] family` | `--ui-font-family` | UI chrome font family string |
 | `[ui.font] size` | `--ui-font-size` | UI chrome font size (`8..48`) |
 
-You can override any setting from the CLI or via the **Fonts: …** button in the top toolbar:
+You can override any setting from the CLI (including switching between the Swing and Compose Multiplatform Desktop UIs):
 ```bash
+# Launch with Phase 2 Compose Multiplatform Desktop UI
+./ijdiff --ui=compose path/to/Left.kt path/to/Right.kt
+
+# Override editor & UI fonts from CLI
 ./ijdiff --font-family="Ioskeley Mono" --font-size=15 --ui-font-family="Inter" --ui-font-size=13 path/to/Left.kt path/to/Right.kt
 ```
 

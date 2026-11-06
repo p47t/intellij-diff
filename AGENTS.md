@@ -13,7 +13,7 @@ The project is a multi-module Kotlin/Java Gradle build (`JVM Toolchain 17`):
 | [`:diff-core`](diff-core) | `com.intellij.util.diff`, `com.intellij.diff.*`, `org.ijdiff.core` | Vendored & decoupled Apache-2.0 IntelliJ diff engine (`Diff`, `IntLCS`, `PatienceIntLCS`, `UniqueLCS`, `Reindexer`, `ComparisonManagerImpl`, `ByLineRt`, `ByWordRt`, `ByCharRt`) plus `LineOffsets`, `LineNumberConvertor`, `UnifiedFragmentBuilder`, `DiffDividerGeometry`, and `DiffSampleCatalog`. **Zero UI dependencies.** |
 | [`:diff-model`](diff-model) | `org.ijdiff.model.*` | UI-agnostic reactive state & session controllers (`DiffDocument`, `TwoWayDiffSession`, `DirDiffSession`, `IjDiffConfig`). Manages line-ending-preserving explicit Save (`Ctrl+S`), Undo/Redo, chunk patching (`replaceChunk` / `appendChunk`), directory scanning/filtering/synchronization, and TOML configuration. **Zero UI dependencies.** |
 | [`:diff-ui-swing`](diff-ui-swing) | `org.ijdiff.ui.swing.*` | Phase 1 Desktop UI powered by Swing, FlatLaf (`FlatDarculaLaf` / `FlatIntelliJLaf`), and `RSyntaxTextArea` (`TwoWayDiffPanel`, `DiffEditorPane`, `DiffDividerComponent`, `UnifiedDiffPane`, `DirDiffMasterDetailPanel`, `MainWindow`, `DiffThemeManager`, `DiffIcons`). |
-| [`:diff-ui-compose`](diff-ui-compose) | `org.ijdiff.ui.compose.*` | Phase 2 presentation bridge for Compose Multiplatform Desktop + JetBrains Jewel, consuming `:diff-model` and `:diff-core` with zero Swing dependencies. |
+| [`:diff-ui-compose`](diff-ui-compose) | `org.ijdiff.ui.compose.*` | Phase 2 Compose Multiplatform Desktop UI (`ComposeMainWindow`, `ComposeTwoWayDiffView`, `ComposeDirDiffView`, `ComposeSyntaxHighlighter`, `ComposeThemeState`, `ComposeDiffWidgets`, `ComposeDiffPresentation`), consuming `:diff-model` and `:diff-core`. |
 | [`:app`](app) | `org.ijdiff.app` | Clikt-based CLI entry point (`Main.kt` / `IjDiffCli`) and distribution/fat-JAR packaging tasks. |
 | [`samples/`](samples) | N/A | Automated test corpus containing 12 file diff pairs (`samples/files/01-*` .. `12-*`) and a multi-directory microservice tree (`samples/directories/dir-01-microservice-release`). |
 
@@ -45,6 +45,7 @@ Java 17 (`temurin-17.0.20+101`) is configured via [`.mise.toml`](.mise.toml).
 Configuration uses **TOML** ([`ijdiff.toml`](ijdiff.toml) in the working directory or `~/.config/ijdiff/config.toml`) and is parsed/serialized by [`IjDiffConfig`](diff-model/src/main/kotlin/org/ijdiff/model/config/IjDiffConfig.kt).
 
 - **1-to-1 Naming Rule**: Every configuration key in `ijdiff.toml` must map 1-to-1 to a CLI option in [`IjDiffCli`](app/src/main/kotlin/org/ijdiff/app/Main.kt):
+  - `ui` (`"swing"` | `"compose"`) $\leftrightarrow$ `--ui`
   - `theme` (`"dark"` | `"light"`) $\leftrightarrow$ `--theme`
   - `unified` (`true` | `false`) $\leftrightarrow$ `-u`, `--unified` / `--no-unified`
   - `whitespace` (`"default"` | `"trim"` | `"ignore"`) $\leftrightarrow$ `-w`, `--whitespace`

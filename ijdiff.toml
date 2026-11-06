@@ -2,6 +2,8 @@
 # Placed in ./ijdiff.toml or ~/.config/ijdiff/config.toml
 # Every key corresponds 1-to-1 with a CLI option.
 
+# Desktop UI toolkit: "swing" (Phase 1) or "compose" (Phase 2 Compose Multiplatform) (CLI: --ui)
+ui = "swing"
 theme = "dark"
 unified = false
 whitespace = "default"

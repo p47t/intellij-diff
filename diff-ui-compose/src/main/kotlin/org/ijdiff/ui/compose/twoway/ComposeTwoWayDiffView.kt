@@ -1,0 +1,921 @@
+package org.ijdiff.ui.compose.twoway
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.intellij.diff.comparison.ComparisonPolicy
+import com.intellij.diff.fragments.LineFragment
+import kotlinx.coroutines.launch
+import org.ijdiff.core.TextDiffType
+import org.ijdiff.core.UnifiedFragmentBuilder
+import org.ijdiff.core.getDiffType
+import org.ijdiff.model.document.DiffDocument
+import org.ijdiff.model.twoway.ChunkDirection
+import org.ijdiff.model.twoway.DiffViewMode
+import org.ijdiff.model.twoway.HighlightPolicy
+import org.ijdiff.model.twoway.TwoWayDiffSession
+import org.ijdiff.ui.compose.ComposeDiffPresentation
+import org.ijdiff.ui.compose.components.ComposeVectorIcon
+import org.ijdiff.ui.compose.components.ToolbarActionButton
+import org.ijdiff.ui.compose.components.ToolbarDropdownSelector
+import org.ijdiff.ui.compose.components.VectorIconKind
+import org.ijdiff.ui.compose.syntax.ComposeSyntaxHighlighter
+import org.ijdiff.ui.compose.theme.LocalComposeThemeState
+import kotlin.math.max
+
+/**
+ * Phase 2 Compose Multiplatform Desktop 2-Way Diff Viewer (`Side-by-Side` & `Unified`).
+ * Features synchronized scrolling via [org.ijdiff.core.LineNumberConvertor], interactive `>>`/`<<` chunk patching,
+ * smooth cubic Bezier curve divider in a Compose [Canvas], overview minimap bar, freehand editing, and explicit Save (`Ctrl+S`).
+ */
+@Composable
+fun ComposeTwoWayDiffView(
+    session: TwoWayDiffSession,
+    onDirtyStateChanged: () -> Unit = {}
+) {
+    val theme = LocalComposeThemeState.current
+    val palette = theme.palette
+    val state by session.state.collectAsState()
+    val viewMode by session.viewMode.collectAsState()
+    val comparisonPolicy by session.comparisonPolicy.collectAsState()
+    val highlightPolicy by session.highlightPolicy.collectAsState()
+    val leftDirty by session.leftDocument.isDirty.collectAsState()
+    val rightDirty by session.rightDocument.isDirty.collectAsState()
+    val leftCanUndo by session.leftDocument.canUndo.collectAsState()
+    val rightCanUndo by session.rightDocument.canUndo.collectAsState()
+
+    var editMode by remember { mutableStateOf(false) }
+    var appendChunksMode by remember { mutableStateOf(false) }
+
+    val leftScroll = rememberScrollState()
+    val rightScroll = rememberScrollState()
+    val unifiedScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    val lineHeightDp: Dp = (theme.editorFontSizePt + 7).dp
+    val density = LocalDensity.current
+    val lineHeightPx = with(density) { lineHeightDp.toPx().coerceAtLeast(16f) }
+
+    // Synchronize left -> right scroll via LineNumberConvertor
+    var syncingFromLeft by remember { mutableStateOf(false) }
+    var syncingFromRight by remember { mutableStateOf(false) }
+
+    LaunchedEffect(leftScroll.value) {
+        if (syncingFromRight) return@LaunchedEffect
+        syncingFromLeft = true
+        try {
+            val anchorLine1 = (leftScroll.value / lineHeightPx).toInt()
+            val subLineOffset = leftScroll.value % lineHeightPx
+            val anchorLine2 = state.lineConvertor.convertApproximate1(anchorLine1)
+            val targetPx = (anchorLine2 * lineHeightPx + subLineOffset).toInt().coerceAtLeast(0)
+            if (kotlin.math.abs(rightScroll.value - targetPx) > 2) {
+                rightScroll.scrollTo(targetPx)
+            }
+        } finally {
+            syncingFromLeft = false
+        }
+    }
+
+    LaunchedEffect(rightScroll.value) {
+        if (syncingFromLeft) return@LaunchedEffect
+        syncingFromRight = true
+        try {
+            val anchorLine2 = (rightScroll.value / lineHeightPx).toInt()
+            val subLineOffset = rightScroll.value % lineHeightPx
+            val anchorLine1 = state.lineConvertor.convertApproximateInv1(anchorLine2)
+            val targetPx = (anchorLine1 * lineHeightPx + subLineOffset).toInt().coerceAtLeast(0)
+            if (kotlin.math.abs(leftScroll.value - targetPx) > 2) {
+                leftScroll.scrollTo(targetPx)
+            }
+        } finally {
+            syncingFromRight = false
+        }
+    }
+
+    fun scrollToFragment(fragment: LineFragment) {
+        scope.launch {
+            val targetLine = fragment.startLine1
+            val targetY = ((targetLine - 3).coerceAtLeast(0) * lineHeightPx).toInt()
+            if (viewMode == DiffViewMode.UNIFIED) {
+                unifiedScroll.animateScrollTo(targetY)
+            } else {
+                leftScroll.animateScrollTo(targetY)
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.appBg)
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    when {
+                        (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.S -> {
+                            session.saveAll()
+                            onDirtyStateChanged()
+                            true
+                        }
+                        event.key == Key.F7 && event.isShiftPressed -> {
+                            session.prevDifference()?.let { scrollToFragment(it) }
+                            true
+                        }
+                        event.key == Key.F7 -> {
+                            session.nextDifference()?.let { scrollToFragment(it) }
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            }
+    ) {
+        // Toolbar
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.toolbarBg)
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            ToolbarActionButton(
+                text = "Prev",
+                icon = VectorIconKind.ARROW_UP,
+                onClick = { session.prevDifference()?.let { scrollToFragment(it) } }
+            )
+            Spacer(Modifier.width(4.dp))
+            ToolbarActionButton(
+                text = "Next",
+                icon = VectorIconKind.ARROW_DOWN,
+                onClick = { session.nextDifference()?.let { scrollToFragment(it) } }
+            )
+            Spacer(Modifier.width(10.dp))
+
+            ToolbarDropdownSelector(
+                selected = viewMode,
+                options = DiffViewMode.entries,
+                labelFor = { it.displayName },
+                onSelected = { session.setViewMode(it) }
+            )
+            Spacer(Modifier.width(6.dp))
+
+            ToolbarDropdownSelector(
+                selected = comparisonPolicy,
+                options = ComparisonPolicy.entries,
+                labelFor = { it.name },
+                onSelected = { session.setComparisonPolicy(it) }
+            )
+            Spacer(Modifier.width(6.dp))
+
+            ToolbarDropdownSelector(
+                selected = highlightPolicy,
+                options = HighlightPolicy.entries,
+                labelFor = { it.displayName },
+                onSelected = { session.setHighlightPolicy(it) }
+            )
+            Spacer(Modifier.width(10.dp))
+
+            ToolbarActionButton(
+                text = if (appendChunksMode) "Chunk: Append" else "Chunk: Replace",
+                active = appendChunksMode,
+                onClick = { appendChunksMode = !appendChunksMode }
+            )
+            Spacer(Modifier.width(6.dp))
+
+            ToolbarActionButton(
+                text = if (editMode) "Editing Text" else "Edit Text",
+                active = editMode,
+                onClick = { editMode = !editMode }
+            )
+            Spacer(Modifier.width(10.dp))
+
+            ToolbarActionButton(
+                text = "Undo L",
+                icon = VectorIconKind.UNDO,
+                enabled = leftCanUndo,
+                onClick = {
+                    if (session.leftDocument.undo()) {
+                        session.recomputeNow()
+                        onDirtyStateChanged()
+                    }
+                }
+            )
+            Spacer(Modifier.width(4.dp))
+            ToolbarActionButton(
+                text = "Undo R",
+                icon = VectorIconKind.UNDO,
+                enabled = rightCanUndo,
+                onClick = {
+                    if (session.rightDocument.undo()) {
+                        session.recomputeNow()
+                        onDirtyStateChanged()
+                    }
+                }
+            )
+            Spacer(Modifier.width(6.dp))
+
+            val anyDirty = leftDirty || rightDirty
+            ToolbarActionButton(
+                text = if (anyDirty) "Save *" else "Save",
+                enabled = anyDirty,
+                bold = true,
+                onClick = {
+                    session.saveAll()
+                    onDirtyStateChanged()
+                }
+            )
+
+            Spacer(Modifier.weight(1f))
+
+            val totalDiffs = state.fragments.size
+            val statusStr = if (totalDiffs == 0) {
+                "Contents are identical"
+            } else {
+                val cur = (state.currentFragmentIndex + 1).coerceIn(1, totalDiffs)
+                "Difference $cur of $totalDiffs"
+            }
+            Text(
+                text = statusStr,
+                color = palette.editorFg,
+                fontFamily = theme.uiFontFamily,
+                fontSize = theme.uiFontSizePt.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        if (viewMode == DiffViewMode.UNIFIED) {
+            ComposeUnifiedDiffPane(
+                unifiedResult = state.unifiedResult,
+                scrollState = unifiedScroll,
+                lineHeightDp = lineHeightDp
+            )
+        } else {
+            // File header strip
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(palette.appBg)
+                    .border(0.5.dp, palette.gutterBorder)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                val leftBadge = buildString {
+                    append(session.leftDocument.title)
+                    if (leftDirty) append(" *")
+                    append("  (${session.leftDocument.lineSeparator.name})")
+                    if (session.leftDocument.isReadOnly) append(" [Read-Only]")
+                }
+                val rightBadge = buildString {
+                    append(session.rightDocument.title)
+                    if (rightDirty) append(" *")
+                    append("  (${session.rightDocument.lineSeparator.name})")
+                    if (session.rightDocument.isReadOnly) append(" [Read-Only]")
+                }
+                Text(
+                    text = leftBadge,
+                    color = palette.editorFg,
+                    fontFamily = theme.uiFontFamily,
+                    fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(42.dp))
+                Text(
+                    text = rightBadge,
+                    color = palette.editorFg,
+                    fontFamily = theme.uiFontFamily,
+                    fontSize = (theme.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // 4-Column Side-by-Side Layout: Left Pane | Bezier Divider | Right Pane | Overview Bar
+            Row(modifier = Modifier.fillMaxSize()) {
+                ComposeDiffSidePane(
+                    isLeft = true,
+                    document = session.leftDocument,
+                    fragments = state.fragments,
+                    activeFragmentIndex = state.currentFragmentIndex,
+                    scrollState = leftScroll,
+                    lineHeightDp = lineHeightDp,
+                    editMode = editMode,
+                    canTargetAcceptChunks = !session.rightDocument.isReadOnly,
+                    onChunkAction = { fragment ->
+                        if (appendChunksMode) {
+                            session.appendChunk(fragment, ChunkDirection.LEFT_TO_RIGHT)
+                        } else {
+                            session.replaceChunk(fragment, ChunkDirection.LEFT_TO_RIGHT)
+                        }
+                        onDirtyStateChanged()
+                    },
+                    onTextEdited = { newText ->
+                        session.leftDocument.setText(newText, recordUndo = true)
+                        session.recomputeNow()
+                        onDirtyStateChanged()
+                    },
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+
+                // Center Bezier Curve Divider Canvas
+                ComposeBezierDividerCanvas(
+                    session = session,
+                    lineHeightPx = lineHeightPx,
+                    leftScrollPx = leftScroll.value.toFloat(),
+                    rightScrollPx = rightScroll.value.toFloat(),
+                    onFragmentClicked = { idx ->
+                        session.selectFragment(idx)?.let { scrollToFragment(it) }
+                    },
+                    modifier = Modifier.width(38.dp).fillMaxHeight()
+                )
+
+                ComposeDiffSidePane(
+                    isLeft = false,
+                    document = session.rightDocument,
+                    fragments = state.fragments,
+                    activeFragmentIndex = state.currentFragmentIndex,
+                    scrollState = rightScroll,
+                    lineHeightDp = lineHeightDp,
+                    editMode = editMode,
+                    canTargetAcceptChunks = !session.leftDocument.isReadOnly,
+                    onChunkAction = { fragment ->
+                        if (appendChunksMode) {
+                            session.appendChunk(fragment, ChunkDirection.RIGHT_TO_LEFT)
+                        } else {
+                            session.replaceChunk(fragment, ChunkDirection.RIGHT_TO_LEFT)
+                        }
+                        onDirtyStateChanged()
+                    },
+                    onTextEdited = { newText ->
+                        session.rightDocument.setText(newText, recordUndo = true)
+                        session.recomputeNow()
+                        onDirtyStateChanged()
+                    },
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+
+                // Right Overview Minimap Bar
+                ComposeOverviewBarCanvas(
+                    fragments = state.fragments,
+                    totalLines = max(session.leftDocument.lineCount, session.rightDocument.lineCount).coerceAtLeast(1),
+                    onLineClicked = { targetLine ->
+                        scope.launch {
+                            val targetY = ((targetLine - 3).coerceAtLeast(0) * lineHeightPx).toInt()
+                            leftScroll.animateScrollTo(targetY)
+                        }
+                    },
+                    modifier = Modifier.width(14.dp).fillMaxHeight()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComposeDiffSidePane(
+    isLeft: Boolean,
+    document: DiffDocument,
+    fragments: List<LineFragment>,
+    activeFragmentIndex: Int,
+    scrollState: ScrollState,
+    lineHeightDp: Dp,
+    editMode: Boolean,
+    canTargetAcceptChunks: Boolean,
+    onChunkAction: (LineFragment) -> Unit,
+    onTextEdited: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalComposeThemeState.current
+    val palette = theme.palette
+    val text by document.text.collectAsState()
+    val lines = remember(text) { text.split('\n') }
+    val horizontalScroll = rememberScrollState()
+
+    // Map each 0-based line to its containing fragment & inline highlight ranges
+    data class LineFragmentInfo(
+        val fragmentIndex: Int,
+        val fragment: LineFragment,
+        val diffType: TextDiffType,
+        val isFirstLineOfFragment: Boolean,
+        val isLastLineOfFragment: Boolean,
+        val inlineRanges: List<ComposeSyntaxHighlighter.InlineHighlightRange>
+    )
+
+    val lineInfoMap = remember(text, fragments, palette) {
+        val map = HashMap<Int, LineFragmentInfo>()
+        val offsets = document.lineOffsets
+        for ((idx, fragment) in fragments.withIndex()) {
+            val startLine = if (isLeft) fragment.startLine1 else fragment.startLine2
+            val endLine = if (isLeft) fragment.endLine1 else fragment.endLine2
+            val baseOffset = if (isLeft) fragment.startOffset1 else fragment.startOffset2
+            val diffType = fragment.getDiffType()
+            val wordBg = palette.getWordBg(diffType)
+
+            for (line in startLine until endLine) {
+                if (line !in 0 until offsets.lineCount) continue
+                val lineStartAbs = offsets.getLineStart(line)
+                val lineEndAbs = offsets.getLineEnd(line)
+                val inlineList = mutableListOf<ComposeSyntaxHighlighter.InlineHighlightRange>()
+                fragment.innerFragments?.forEach { df ->
+                    val relS = if (isLeft) df.startOffset1 else df.startOffset2
+                    val relE = if (isLeft) df.endOffset1 else df.endOffset2
+                    val absS = (baseOffset + relS).coerceIn(lineStartAbs, lineEndAbs)
+                    val absE = (baseOffset + relE).coerceIn(lineStartAbs, lineEndAbs)
+                    if (absS < absE) {
+                        inlineList.add(
+                            ComposeSyntaxHighlighter.InlineHighlightRange(
+                                startCol = absS - lineStartAbs,
+                                endCol = absE - lineStartAbs,
+                                backgroundColor = wordBg
+                            )
+                        )
+                    }
+                }
+                map[line] = LineFragmentInfo(
+                    fragmentIndex = idx,
+                    fragment = fragment,
+                    diffType = diffType,
+                    isFirstLineOfFragment = (line == startLine),
+                    isLastLineOfFragment = (line == endLine - 1),
+                    inlineRanges = inlineList
+                )
+            }
+        }
+        map
+    }
+
+    val emptyRangeMarkers = remember(fragments) {
+        val markers = HashMap<Int, TextDiffType>()
+        for (fragment in fragments) {
+            val startLine = if (isLeft) fragment.startLine1 else fragment.startLine2
+            val endLine = if (isLeft) fragment.endLine1 else fragment.endLine2
+            if (startLine == endLine) {
+                markers[startLine] = fragment.getDiffType()
+            }
+        }
+        markers
+    }
+
+    Box(
+        modifier = modifier
+            .background(palette.editorBg)
+    ) {
+        if (editMode && !document.isReadOnly) {
+            BasicTextField(
+                value = text,
+                onValueChange = { onTextEdited(it) },
+                textStyle = TextStyle(
+                    color = palette.editorFg,
+                    fontFamily = theme.editorFontFamily,
+                    fontSize = theme.editorFontSizePt.sp,
+                    lineHeight = lineHeightDp.value.sp
+                ),
+                cursorBrush = SolidColor(palette.editorFg),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+        } else {
+            val gutterDigits = max(3, lines.size.toString().length)
+            val gutterNumWidth = (gutterDigits * 9 + 14).dp
+            val actionColWidth = 22.dp
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                for ((lineIdx, lineStr) in lines.withIndex()) {
+                    val info = lineInfoMap[lineIdx]
+                    val emptyMarkerType = emptyRangeMarkers[lineIdx]
+                    val lineBg = info?.let { palette.getLineBg(it.diffType) } ?: palette.editorBg
+                    val isActiveFragment = info != null && info.fragmentIndex == activeFragmentIndex
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(lineHeightDp)
+                            .background(lineBg)
+                    ) {
+                        // Gutter (Line Number + >> / << Chunk Button)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .height(lineHeightDp)
+                                .background(info?.let { palette.getLineBg(it.diffType) } ?: palette.gutterBg)
+                        ) {
+                            if (!isLeft) {
+                                // Right pane: << button on the left edge of gutter
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .width(actionColWidth)
+                                        .fillMaxHeight()
+                                        .let { mod ->
+                                            if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                                mod.clickable { onChunkAction(info.fragment) }
+                                            } else mod
+                                        }
+                                ) {
+                                    if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                        ComposeVectorIcon(
+                                            kind = VectorIconKind.CHEVRON_LEFT,
+                                            tint = palette.getBorderColor(info.diffType),
+                                            modifier = Modifier.width(14.dp).height(12.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Text(
+                                text = (lineIdx + 1).toString(),
+                                color = palette.gutterFg,
+                                fontFamily = theme.editorFontFamily,
+                                fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier
+                                    .width(gutterNumWidth)
+                                    .padding(end = 6.dp)
+                            )
+
+                            if (isLeft) {
+                                // Left pane: >> button on the right edge of gutter
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .width(actionColWidth)
+                                        .fillMaxHeight()
+                                        .let { mod ->
+                                            if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                                mod.clickable { onChunkAction(info.fragment) }
+                                            } else mod
+                                        }
+                                ) {
+                                    if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                        ComposeVectorIcon(
+                                            kind = VectorIconKind.CHEVRON_RIGHT,
+                                            tint = palette.getBorderColor(info.diffType),
+                                            modifier = Modifier.width(14.dp).height(12.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Gutter vertical divider
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .fillMaxHeight()
+                                .background(palette.gutterBorder)
+                        )
+
+                        // Code line with syntax + inline word diff highlights
+                        Box(
+                            contentAlignment = Alignment.CenterStart,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .horizontalScroll(horizontalScroll)
+                                .padding(horizontal = 8.dp)
+                        ) {
+                            val annotated = remember(lineStr, palette, info?.inlineRanges) {
+                                ComposeSyntaxHighlighter.highlightLine(
+                                    lineText = lineStr.replace("\t", "    "),
+                                    palette = palette,
+                                    inlineRanges = info?.inlineRanges ?: emptyList()
+                                )
+                            }
+                            Text(
+                                text = annotated,
+                                color = palette.editorFg,
+                                fontFamily = theme.editorFontFamily,
+                                fontSize = theme.editorFontSizePt.sp,
+                                softWrap = false,
+                                maxLines = 1
+                            )
+
+                            if (emptyMarkerType != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(2.dp)
+                                        .align(Alignment.TopStart)
+                                        .background(palette.getBorderColor(emptyMarkerType))
+                                )
+                            }
+                            if (isActiveFragment && info.isFirstLineOfFragment) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.5.dp)
+                                        .align(Alignment.TopStart)
+                                        .background(palette.activeFragmentBorder)
+                                )
+                            }
+                            if (isActiveFragment && info.isLastLineOfFragment) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.5.dp)
+                                        .align(Alignment.BottomStart)
+                                        .background(palette.activeFragmentBorder)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComposeBezierDividerCanvas(
+    session: TwoWayDiffSession,
+    lineHeightPx: Float,
+    leftScrollPx: Float,
+    rightScrollPx: Float,
+    onFragmentClicked: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val theme = LocalComposeThemeState.current
+    val palette = theme.palette
+    val state by session.state.collectAsState()
+    val presentation = remember(session) { ComposeDiffPresentation(session) }
+
+    Canvas(
+        modifier = modifier
+            .background(palette.dividerBg)
+            .pointerInput(state.fragments, lineHeightPx, leftScrollPx, rightScrollPx) {
+                detectTapGestures { tapOffset ->
+                    val polygons = presentation.computeDividerPolygons(
+                        dividerWidthPx = size.width.toFloat(),
+                        lineHeightPx = lineHeightPx,
+                        leftScrollYPx = leftScrollPx,
+                        rightScrollYPx = rightScrollPx,
+                        isDarkTheme = palette.isDark
+                    )
+                    val hit = polygons.firstOrNull { poly ->
+                        val p = poly.polygon
+                        val minY = minOf(p.startY1, p.startY2) - 4f
+                        val maxY = maxOf(p.endY1, p.endY2) + 4f
+                        tapOffset.y in minY..maxY
+                    }
+                    if (hit != null) {
+                        onFragmentClicked(hit.fragmentIndex)
+                    }
+                }
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+
+        val polygons = presentation.computeDividerPolygons(
+            dividerWidthPx = w,
+            lineHeightPx = lineHeightPx,
+            leftScrollYPx = leftScrollPx,
+            rightScrollYPx = rightScrollPx,
+            isDarkTheme = palette.isDark
+        )
+
+        for (poly in polygons) {
+            val p = poly.polygon
+            if (maxOf(p.endY1, p.endY2) < 0f || minOf(p.startY1, p.startY2) > h) continue
+
+            val path = Path().apply {
+                moveTo(0f, p.startY1)
+                cubicTo(
+                    p.topCurve.ctrl1X, p.topCurve.ctrl1Y,
+                    p.topCurve.ctrl2X, p.topCurve.ctrl2Y,
+                    p.topCurve.endX, p.topCurve.endY
+                )
+                lineTo(w, p.endY2)
+                cubicTo(
+                    p.bottomCurve.ctrl1X, p.bottomCurve.ctrl1Y,
+                    p.bottomCurve.ctrl2X, p.bottomCurve.ctrl2Y,
+                    p.bottomCurve.endX, p.bottomCurve.endY
+                )
+                close()
+            }
+
+            drawPath(path, color = Color(poly.fillColor.argb))
+
+            val topStroke = Path().apply {
+                moveTo(0f, p.startY1)
+                cubicTo(
+                    p.topCurve.ctrl1X, p.topCurve.ctrl1Y,
+                    p.topCurve.ctrl2X, p.topCurve.ctrl2Y,
+                    p.topCurve.endX, p.topCurve.endY
+                )
+            }
+            val bottomStroke = Path().apply {
+                moveTo(w, p.endY2)
+                cubicTo(
+                    p.bottomCurve.ctrl1X, p.bottomCurve.ctrl1Y,
+                    p.bottomCurve.ctrl2X, p.bottomCurve.ctrl2Y,
+                    p.bottomCurve.endX, p.bottomCurve.endY
+                )
+            }
+            val strokeColor = if (poly.isSelected) palette.activeFragmentBorder else Color(poly.strokeColor.argb)
+            val strokeWidth = if (poly.isSelected) 2.0f else 1.1f
+            drawPath(topStroke, color = strokeColor, style = Stroke(width = strokeWidth))
+            drawPath(bottomStroke, color = strokeColor, style = Stroke(width = strokeWidth))
+        }
+
+        // Left and right border lines
+        drawLine(palette.gutterBorder, Offset(0f, 0f), Offset(0f, h), strokeWidth = 1f)
+        drawLine(palette.gutterBorder, Offset(w - 1f, 0f), Offset(w - 1f, h), strokeWidth = 1f)
+    }
+}
+
+@Composable
+private fun ComposeOverviewBarCanvas(
+    fragments: List<LineFragment>,
+    totalLines: Int,
+    onLineClicked: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalComposeThemeState.current.palette
+    Canvas(
+        modifier = modifier
+            .background(palette.gutterBg)
+            .pointerInput(totalLines) {
+                detectTapGestures { offset ->
+                    if (size.height > 0) {
+                        val targetLine = ((offset.y / size.height) * totalLines).toInt().coerceIn(0, totalLines - 1)
+                        onLineClicked(targetLine)
+                    }
+                }
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+        val denom = totalLines.coerceAtLeast(1).toFloat()
+        for (fragment in fragments) {
+            val type = fragment.getDiffType()
+            val y1 = (fragment.startLine1 / denom) * h
+            val y2 = ((fragment.endLine1.coerceAtLeast(fragment.startLine1 + 1)) / denom) * h
+            val barH = (y2 - y1).coerceAtLeast(3f)
+            drawRect(
+                color = palette.getBorderColor(type),
+                topLeft = Offset(2f, y1),
+                size = Size(w - 4f, barH)
+            )
+        }
+        drawLine(palette.gutterBorder, Offset(0f, 0f), Offset(0f, h), strokeWidth = 1f)
+    }
+}
+
+@Composable
+private fun ComposeUnifiedDiffPane(
+    unifiedResult: UnifiedFragmentBuilder.UnifiedDiffResult,
+    scrollState: ScrollState,
+    lineHeightDp: Dp
+) {
+    val theme = LocalComposeThemeState.current
+    val palette = theme.palette
+    val lines = remember(unifiedResult.text) { unifiedResult.text.split('\n') }
+    val horizontalScroll = rememberScrollState()
+    val colWidth = 42.dp
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(palette.editorBg)
+            .verticalScroll(scrollState)
+    ) {
+        for ((uLine, lineStr) in lines.withIndex()) {
+            val mapping = unifiedResult.lineMappings.getOrNull(uLine)
+            val diffType = mapping?.type
+            val lineBg = diffType?.let { palette.getLineBg(it) } ?: palette.editorBg
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(lineHeightDp)
+                    .background(lineBg)
+            ) {
+                // Dual left/right line-number gutter
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .height(lineHeightDp)
+                        .background(diffType?.let { palette.getLineBg(it) } ?: palette.gutterBg)
+                ) {
+                    Text(
+                        text = if (mapping != null && mapping.leftLine >= 0) (mapping.leftLine + 1).toString() else "",
+                        color = palette.gutterFg,
+                        fontFamily = theme.editorFontFamily,
+                        fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(colWidth).padding(end = 6.dp)
+                    )
+                    Box(Modifier.width(1.dp).fillMaxHeight().background(palette.gutterBorder))
+                    Text(
+                        text = if (mapping != null && mapping.rightLine >= 0) (mapping.rightLine + 1).toString() else "",
+                        color = palette.gutterFg,
+                        fontFamily = theme.editorFontFamily,
+                        fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(colWidth).padding(end = 6.dp)
+                    )
+                    Text(
+                        text = when (diffType) {
+                            TextDiffType.DELETED -> "-"
+                            TextDiffType.INSERTED -> "+"
+                            else -> " "
+                        },
+                        color = diffType?.let { palette.getBorderColor(it) } ?: palette.gutterFg,
+                        fontFamily = theme.editorFontFamily,
+                        fontSize = theme.editorFontSizePt.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(14.dp)
+                    )
+                }
+
+                Box(Modifier.width(1.dp).fillMaxHeight().background(palette.gutterBorder))
+
+                Box(
+                    contentAlignment = Alignment.CenterStart,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .horizontalScroll(horizontalScroll)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    val annotated = remember(lineStr, palette) {
+                        ComposeSyntaxHighlighter.highlightLine(
+                            lineText = lineStr.replace("\t", "    "),
+                            palette = palette
+                        )
+                    }
+                    Text(
+                        text = annotated,
+                        color = palette.editorFg,
+                        fontFamily = theme.editorFontFamily,
+                        fontSize = theme.editorFontSizePt.sp,
+                        softWrap = false,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}

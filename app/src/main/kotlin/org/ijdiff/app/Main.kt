@@ -11,6 +11,8 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
 import org.ijdiff.model.config.IjDiffConfig
 import org.ijdiff.model.twoway.DiffViewMode
+import org.ijdiff.ui.compose.shell.launchComposeMainWindow
+import org.ijdiff.ui.compose.theme.ComposeAppTheme
 import org.ijdiff.ui.swing.shell.MainWindow
 import org.ijdiff.ui.swing.theme.AppTheme
 import org.ijdiff.ui.swing.theme.DiffThemeManager
@@ -60,6 +62,14 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
         "default" to "default",
         "trim" to "trim",
         "ignore" to "ignore"
+    )
+
+    private val uiToolkit by option(
+        "--ui",
+        help = "Desktop UI toolkit: swing (Phase 1 FlatLaf/RSyntaxTextArea) or compose (Phase 2 Compose Multiplatform) (matches ui in ijdiff.toml)"
+    ).choice(
+        "swing" to "swing",
+        "compose" to "compose"
     )
 
     private val theme by option(
@@ -116,6 +126,7 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
             uiFontFamily = uiFontFamily ?: fileConfig.uiFontFamily,
             uiFontSize = uiFontSize ?: fileConfig.uiFontSize,
             theme = theme?.let { if (it.isDark) "dark" else "light" } ?: fileConfig.theme,
+            ui = uiToolkit ?: fileConfig.ui,
             unified = unified ?: fileConfig.unified,
             whitespace = whitespace ?: fileConfig.whitespace
         )
@@ -126,6 +137,21 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
 
         val viewMode = if (effectiveConfig.unified) DiffViewMode.UNIFIED else DiffViewMode.SIDE_BY_SIDE
         val policy = effectiveConfig.resolveComparisonPolicy()
+
+        if (effectiveConfig.ui.equals("compose", ignoreCase = true)) {
+            val composeTheme = if (initialTheme.isDark) ComposeAppTheme.DARK else ComposeAppTheme.LIGHT
+            launchComposeMainWindow(
+                initialTheme = composeTheme,
+                config = effectiveConfig,
+                defaultPolicy = policy,
+                defaultViewMode = viewMode,
+                configPath = resolvedConfigPath,
+                loadSamples = loadSamples,
+                paths = paths
+            )
+            return
+        }
+
         val closeLatch = CountDownLatch(1)
 
         SwingUtilities.invokeLater {
