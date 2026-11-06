@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "kmp-compose-design-system": {
+      "source": "ronjunevaldoz/kmp-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/kmp-compose-design-system/SKILL.md",
+      "computedHash": "8f89be8bf2d59de90f955265e2b1db7e3773a83530d6d0fd83b1e6c1caf1da99"
+    },
+    "kmp-compose-design-system-extended": {
+      "source": "ronjunevaldoz/kmp-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/kmp-compose-design-system-extended/SKILL.md",
+      "computedHash": "d3d015fbd5a8de03f4f258625761859b7342ca0a9bf032f1323b3769cfd088f7"
+    }
+  }
+}
