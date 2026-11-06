@@ -96,6 +96,11 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
         help = "Print git difftool configuration snippet and exit"
     ).flag(default = false)
 
+    private val printJjConfig by option(
+        "--jj-config",
+        help = "Print Jujutsu (jj) merge-tools configuration snippet and exit"
+    ).flag(default = false)
+
     private val loadSamples by option(
         "--load-samples",
         help = "Load the built-in automated testing sample corpus (all 12 file pairs + directory tree) into tabs"
@@ -117,6 +122,22 @@ class IjDiffCli : CliktCommand(name = "ijdiff") {
                     cmd = ijdiff "${'$'}LOCAL" "${'$'}REMOTE"
                 [difftool]
                     prompt = false
+                """.trimIndent()
+            )
+            return
+        }
+
+        if (printJjConfig) {
+            println(
+                """
+                # Add the following to your Jujutsu config (~/.config/jj/config.toml or `jj config edit --user`):
+                [merge-tools.ijdiff]
+                program = "ijdiff"
+                diff-args = ["${'$'}left", "${'$'}right"]
+                edit-args = ["${'$'}left", "${'$'}right"]
+
+                [ui]
+                diff-editor = "ijdiff"
                 """.trimIndent()
             )
             return

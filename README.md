@@ -77,12 +77,46 @@ You can override any setting from the CLI (including switching between the Swing
 ./ijdiff --font-family="Ioskeley Mono" --font-size=15 --ui-font-family="Inter" --ui-font-size=13 path/to/Left.kt path/to/Right.kt
 ```
 
+### Use with Jujutsu (`jj diff`, `jj diffedit`, `jj split`, `jj squash -i`)
+Add `ijdiff` to your Jujutsu user configuration (`~/.config/jj/config.toml` or via `jj config edit --user`, or print with `./ijdiff --jj-config`):
+
+```toml
+[merge-tools.ijdiff]
+program = "ijdiff" # or "/absolute/path/to/ijdiff"
+diff-args = ["$left", "$right"]
+edit-args = ["$left", "$right"]
+# Optional: compare one file at a time instead of opening the full directory tree view:
+# diff-invocation-mode = "file-by-file"
+
+[ui]
+diff-editor = "ijdiff"
+```
+
+Common Jujutsu commands with `ijdiff`:
+```bash
+# View working-copy or revision changes in ijdiff (opens DirDiff for multi-file changes or 2-Way Diff for a single file)
+jj diff --tool ijdiff
+jj diff -r @- --tool ijdiff
+
+# Compare a single file in the current revision
+jj diff --tool ijdiff path/to/File.kt
+
+# Interactively edit/stage chunks in the working copy or an arbitrary revision (apply >> / << chunks and press Ctrl+S)
+jj diffedit
+jj diffedit -r @-
+
+# Interactively split a commit or squash selected chunks into parent using ijdiff
+jj split
+jj squash -i
+```
+
 ### Use as `git difftool` (including `git difftool --dir-diff`)
+Add to `~/.gitconfig` (or print with `./ijdiff --git-config`):
 ```ini
 [diff]
     tool = ijdiff
 [difftool "ijdiff"]
-    cmd = /home/patrick/code/intellij-diff/ijdiff "$LOCAL" "$REMOTE"
+    cmd = ijdiff "$LOCAL" "$REMOTE"
 [difftool]
     prompt = false
 ```
