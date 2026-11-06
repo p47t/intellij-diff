@@ -1,0 +1,2 @@
+# Preserve exact byte-for-byte line endings and binary files in the automated test sample corpus
+samples/** -text

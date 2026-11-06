@@ -1,8 +1,14 @@
 .gradle/
-build/
+/build/
+/diff-core/build/
+/diff-model/build/
+/diff-ui-swing/build/
+/diff-ui-compose/build/
+/app/build/
 out/
 .idea/
 *.iml
 *.ipr
 *.iws
 .DS_Store
+!samples/**
