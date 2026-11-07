@@ -10,9 +10,14 @@ import org.ijdiff.model.document.DiffDocument
 import org.ijdiff.model.twoway.ChunkDirection
 import org.ijdiff.model.twoway.DiffViewMode
 import org.ijdiff.model.twoway.TwoWayDiffSession
+import org.ijdiff.ui.compose.components.AppButton
+import org.ijdiff.ui.compose.components.AppDialog
+import org.ijdiff.ui.compose.components.AppText
+import org.ijdiff.ui.compose.components.ButtonVariant
 import org.ijdiff.ui.compose.dirdiff.ComposeDirDiffView
 import org.ijdiff.ui.compose.shell.ComposeMainScreen
 import org.ijdiff.ui.compose.shell.ComposeShellController
+import org.ijdiff.ui.compose.theme.AppTheme
 import org.ijdiff.ui.compose.theme.ComposeAppTheme
 import org.ijdiff.ui.compose.theme.ComposeThemeState
 import org.ijdiff.ui.compose.theme.ProvideComposeDiffTheme
@@ -26,6 +31,43 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 class ComposeDiffPresentationTest {
+
+    @Test
+    fun `AppTheme exposes semantic tokens and renders AppDialog with ButtonVariant without Material`() {
+        val themeState = ComposeThemeState(initialTheme = ComposeAppTheme.DARK)
+        ImageComposeScene(width = 640, height = 420).use { scene ->
+            scene.setContent {
+                ProvideComposeDiffTheme(themeState) {
+                    assertEquals(true, AppTheme.colors.isDark)
+                    assertTrue(AppTheme.spacing.toolbarHeight.value > 0f)
+                    assertNotNull(AppTheme.shapes.control)
+                    assertNotNull(AppTheme.typography.uiDefault)
+
+                    AppDialog(
+                        title = "Design System Verification",
+                        onDismissRequest = {},
+                        actions = {
+                            AppButton(
+                                text = "Confirm",
+                                variant = ButtonVariant.ToolbarPrimary,
+                                onClick = {}
+                            )
+                            AppButton(
+                                text = "Toggle",
+                                variant = ButtonVariant.ToolbarToggle(active = true),
+                                onClick = {}
+                            )
+                        }
+                    ) {
+                        AppText("Custom design system dialog content")
+                    }
+                }
+            }
+            val img = scene.render()
+            assertEquals(640, img.width)
+            assertEquals(420, img.height)
+        }
+    }
 
     @Test
     fun `ComposeDiffPresentation computes Canvas Bezier polygons and applies chunk actions without Swing`() {

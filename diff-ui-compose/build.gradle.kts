@@ -6,7 +6,7 @@ plugins {
 dependencies {
     api(project(":diff-model"))
     implementation(compose.desktop.currentOs)
-    implementation(compose.material)
+    implementation(compose.foundation)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.swing)
     testImplementation(libs.kotlinx.coroutines.test)

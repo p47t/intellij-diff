@@ -1,13 +1,22 @@
 package org.ijdiff.ui.compose.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle as ComposeFontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.ijdiff.core.TextDiffType
 import org.ijdiff.model.config.IjDiffConfig
 import org.jetbrains.skia.FontMgr
@@ -20,6 +29,7 @@ enum class ComposeAppTheme(val isDark: Boolean, val displayName: String) {
     LIGHT(false, "IntelliJ Light")
 }
 
+@Immutable
 data class ComposeDiffColorPalette(
     val isDark: Boolean,
     val appBg: Color,
@@ -115,6 +125,59 @@ data class ComposeDiffColorPalette(
     }
 }
 
+/**
+ * Semantic spacing and dimension tokens for the `ijdiff` Compose design system.
+ */
+@Immutable
+data class AppSpacing(
+    val xxs: Dp = 2.dp,
+    val xs: Dp = 4.dp,
+    val sm: Dp = 6.dp,
+    val md: Dp = 8.dp,
+    val lg: Dp = 10.dp,
+    val xl: Dp = 14.dp,
+    val xxl: Dp = 16.dp,
+    val controlHeight: Dp = 26.dp,
+    val toolbarHeight: Dp = 26.dp,
+    val toolbarHorizontalPadding: Dp = 10.dp,
+    val toolbarVerticalPadding: Dp = 5.dp,
+    val tabBarHeight: Dp = 32.dp,
+    val gutterActionWidth: Dp = 22.dp,
+    val dividerWidth: Dp = 38.dp,
+    val overviewBarWidth: Dp = 14.dp
+)
+
+/**
+ * Semantic shape tokens for desktop controls, tabs, and modal surfaces.
+ */
+@Immutable
+data class AppShapes(
+    val subtle: RoundedCornerShape = RoundedCornerShape(4.dp),
+    val control: RoundedCornerShape = RoundedCornerShape(4.dp),
+    val tab: RoundedCornerShape = RoundedCornerShape(4.dp),
+    val modal: RoundedCornerShape = RoundedCornerShape(6.dp),
+    val dialog: RoundedCornerShape = RoundedCornerShape(6.dp)
+)
+
+/**
+ * Semantic typography scale derived from user-configured UI and editor font families/sizes.
+ */
+@Immutable
+data class AppTypography(
+    val caption: TextStyle,
+    val bodySmall: TextStyle,
+    val bodySmallBold: TextStyle,
+    val bodyMedium: TextStyle,
+    val bodyBold: TextStyle,
+    val bodyItalic: TextStyle,
+    val titleSmall: TextStyle,
+    val code: TextStyle,
+    val codeBold: TextStyle,
+    val gutterNumber: TextStyle
+) {
+    val uiDefault: TextStyle get() = bodyMedium
+}
+
 class ComposeThemeState(
     initialTheme: ComposeAppTheme = ComposeAppTheme.DARK,
     initialConfig: IjDiffConfig = IjDiffConfig.DEFAULT
@@ -125,6 +188,9 @@ class ComposeThemeState(
     var uiFontFamilyName by mutableStateOf(initialConfig.uiFontFamily ?: "Inter")
     var uiFontSizePt by mutableStateOf(initialConfig.uiFontSize)
 
+    val spacing: AppSpacing = AppSpacing()
+    val shapes: AppShapes = AppShapes()
+
     val palette: ComposeDiffColorPalette
         get() = if (theme.isDark) ComposeDiffColorPalette.DARK else ComposeDiffColorPalette.LIGHT
 
@@ -133,6 +199,31 @@ class ComposeThemeState(
 
     val uiFontFamily: FontFamily
         get() = resolveFontFamily(uiFontFamilyName, fallback = FontFamily.SansSerif)
+
+    val typography: AppTypography
+        get() {
+            val p = palette
+            val uiFam = uiFontFamily
+            val edFam = editorFontFamily
+            val uiSmallSp = (uiFontSizePt - 1).coerceAtLeast(10).sp
+            val uiMedSp = uiFontSizePt.sp
+            val uiTitleSp = (uiFontSizePt + 1).sp
+            val edSp = editorFontSizePt.sp
+            val gutterSp = (editorFontSizePt - 1).coerceAtLeast(9).sp
+
+            return AppTypography(
+                caption = TextStyle(color = p.gutterFg, fontFamily = uiFam, fontSize = uiSmallSp),
+                bodySmall = TextStyle(color = p.editorFg, fontFamily = uiFam, fontSize = uiSmallSp),
+                bodySmallBold = TextStyle(color = p.editorFg, fontFamily = uiFam, fontSize = uiSmallSp, fontWeight = FontWeight.Bold),
+                bodyMedium = TextStyle(color = p.editorFg, fontFamily = uiFam, fontSize = uiMedSp),
+                bodyBold = TextStyle(color = p.editorFg, fontFamily = uiFam, fontSize = uiMedSp, fontWeight = FontWeight.Bold),
+                bodyItalic = TextStyle(color = p.gutterFg, fontFamily = uiFam, fontSize = uiMedSp, fontStyle = ComposeFontStyle.Italic),
+                titleSmall = TextStyle(color = p.editorFg, fontFamily = uiFam, fontSize = uiTitleSp, fontWeight = FontWeight.Bold),
+                code = TextStyle(color = p.editorFg, fontFamily = edFam, fontSize = edSp),
+                codeBold = TextStyle(color = p.editorFg, fontFamily = edFam, fontSize = edSp, fontWeight = FontWeight.Bold),
+                gutterNumber = TextStyle(color = p.gutterFg, fontFamily = edFam, fontSize = gutterSp)
+            )
+        }
 
     fun applyConfig(config: IjDiffConfig) {
         config.fontFamily?.takeIf { it.isNotBlank() }?.let { editorFontFamilyName = it }
@@ -166,6 +257,36 @@ class ComposeThemeState(
 }
 
 val LocalComposeThemeState = staticCompositionLocalOf { ComposeThemeState() }
+
+/**
+ * Unified Design System accessor object (`AppTheme.colors`, `AppTheme.spacing`, `AppTheme.shapes`, `AppTheme.typography`).
+ */
+object AppTheme {
+    val state: ComposeThemeState
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalComposeThemeState.current
+
+    val colors: ComposeDiffColorPalette
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalComposeThemeState.current.palette
+
+    val spacing: AppSpacing
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalComposeThemeState.current.spacing
+
+    val shapes: AppShapes
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalComposeThemeState.current.shapes
+
+    val typography: AppTypography
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalComposeThemeState.current.typography
+}
 
 @Composable
 fun ProvideComposeDiffTheme(

@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,6 +50,9 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -71,11 +73,15 @@ import org.ijdiff.model.twoway.DiffViewMode
 import org.ijdiff.model.twoway.HighlightPolicy
 import org.ijdiff.model.twoway.TwoWayDiffSession
 import org.ijdiff.ui.compose.ComposeDiffPresentation
+import org.ijdiff.ui.compose.components.AppButton
+import org.ijdiff.ui.compose.components.AppSelect
+import org.ijdiff.ui.compose.components.AppText
+import org.ijdiff.ui.compose.components.AppToolbarSeparator
+import org.ijdiff.ui.compose.components.ButtonVariant
 import org.ijdiff.ui.compose.components.ComposeVectorIcon
-import org.ijdiff.ui.compose.components.ToolbarActionButton
-import org.ijdiff.ui.compose.components.ToolbarDropdownSelector
 import org.ijdiff.ui.compose.components.VectorIconKind
 import org.ijdiff.ui.compose.syntax.ComposeSyntaxHighlighter
+import org.ijdiff.ui.compose.theme.AppTheme
 import org.ijdiff.ui.compose.theme.LocalComposeThemeState
 import kotlin.math.max
 
@@ -198,60 +204,63 @@ fun ComposeTwoWayDiffView(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(palette.toolbarBg)
-                .padding(horizontal = 10.dp, vertical = 5.dp)
+                .padding(horizontal = AppTheme.spacing.toolbarHorizontalPadding, vertical = AppTheme.spacing.toolbarVerticalPadding)
         ) {
-            ToolbarActionButton(
+            AppButton(
                 text = "Prev",
                 icon = VectorIconKind.ARROW_UP,
                 onClick = { session.prevDifference()?.let { scrollToFragment(it) } }
             )
-            Spacer(Modifier.width(4.dp))
-            ToolbarActionButton(
+            Spacer(Modifier.width(AppTheme.spacing.xs))
+            AppButton(
                 text = "Next",
                 icon = VectorIconKind.ARROW_DOWN,
                 onClick = { session.nextDifference()?.let { scrollToFragment(it) } }
             )
-            Spacer(Modifier.width(10.dp))
 
-            ToolbarDropdownSelector(
+            AppToolbarSeparator()
+
+            AppSelect(
                 selected = viewMode,
                 options = DiffViewMode.entries,
                 labelFor = { it.displayName },
                 onSelected = { session.setViewMode(it) }
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(AppTheme.spacing.sm))
 
-            ToolbarDropdownSelector(
+            AppSelect(
                 selected = comparisonPolicy,
                 options = ComparisonPolicy.entries,
                 labelFor = { it.name },
                 onSelected = { session.setComparisonPolicy(it) }
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(AppTheme.spacing.sm))
 
-            ToolbarDropdownSelector(
+            AppSelect(
                 selected = highlightPolicy,
                 options = HighlightPolicy.entries,
                 labelFor = { it.displayName },
                 onSelected = { session.setHighlightPolicy(it) }
             )
-            Spacer(Modifier.width(10.dp))
 
-            ToolbarActionButton(
+            AppToolbarSeparator()
+
+            AppButton(
                 text = if (appendChunksMode) "Chunk: Append" else "Chunk: Replace",
-                active = appendChunksMode,
+                variant = ButtonVariant.ToolbarToggle(appendChunksMode),
                 onClick = { appendChunksMode = !appendChunksMode }
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(AppTheme.spacing.sm))
 
-            ToolbarActionButton(
+            AppButton(
                 text = if (editMode) "Editing Text" else "Edit Text",
-                active = editMode,
+                variant = ButtonVariant.ToolbarToggle(editMode),
                 onClick = { editMode = !editMode }
             )
-            Spacer(Modifier.width(10.dp))
 
-            ToolbarActionButton(
+            AppToolbarSeparator()
+
+            AppButton(
                 text = "Undo L",
                 icon = VectorIconKind.UNDO,
                 enabled = leftCanUndo,
@@ -262,8 +271,8 @@ fun ComposeTwoWayDiffView(
                     }
                 }
             )
-            Spacer(Modifier.width(4.dp))
-            ToolbarActionButton(
+            Spacer(Modifier.width(AppTheme.spacing.xs))
+            AppButton(
                 text = "Undo R",
                 icon = VectorIconKind.UNDO,
                 enabled = rightCanUndo,
@@ -274,13 +283,13 @@ fun ComposeTwoWayDiffView(
                     }
                 }
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(AppTheme.spacing.sm))
 
             val anyDirty = leftDirty || rightDirty
-            ToolbarActionButton(
+            AppButton(
                 text = if (anyDirty) "Save *" else "Save",
                 enabled = anyDirty,
-                bold = true,
+                variant = if (anyDirty) ButtonVariant.ToolbarPrimary else ButtonVariant.ToolbarDefault,
                 onClick = {
                     session.saveAll()
                     onDirtyStateChanged()
@@ -296,7 +305,7 @@ fun ComposeTwoWayDiffView(
                 val cur = (state.currentFragmentIndex + 1).coerceIn(1, totalDiffs)
                 "Difference $cur of $totalDiffs"
             }
-            Text(
+            AppText(
                 text = statusStr,
                 color = palette.editorFg,
                 fontFamily = theme.uiFontFamily,
@@ -318,7 +327,7 @@ fun ComposeTwoWayDiffView(
                     .fillMaxWidth()
                     .background(palette.appBg)
                     .border(0.5.dp, palette.gutterBorder)
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .padding(horizontal = AppTheme.spacing.lg, vertical = AppTheme.spacing.xs)
             ) {
                 val leftBadge = buildString {
                     append(session.leftDocument.title)
@@ -332,7 +341,7 @@ fun ComposeTwoWayDiffView(
                     append("  (${session.rightDocument.lineSeparator.name})")
                     if (session.rightDocument.isReadOnly) append(" [Read-Only]")
                 }
-                Text(
+                AppText(
                     text = leftBadge,
                     color = palette.editorFg,
                     fontFamily = theme.uiFontFamily,
@@ -342,7 +351,7 @@ fun ComposeTwoWayDiffView(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(42.dp))
-                Text(
+                AppText(
                     text = rightBadge,
                     color = palette.editorFg,
                     fontFamily = theme.uiFontFamily,
@@ -421,6 +430,8 @@ fun ComposeTwoWayDiffView(
                 ComposeOverviewBarCanvas(
                     fragments = state.fragments,
                     totalLines = max(session.leftDocument.lineCount, session.rightDocument.lineCount).coerceAtLeast(1),
+                    firstVisibleLine = leftListState.firstVisibleItemIndex,
+                    visibleLineCount = leftListState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(10),
                     onLineClicked = { targetLine ->
                         scope.launch {
                             leftListState.animateScrollToItem((targetLine - 3).coerceAtLeast(0))
@@ -591,7 +602,7 @@ private fun ComposeDiffSidePane(
                                 }
                             }
 
-                            Text(
+                            AppText(
                                 text = (lineIdx + 1).toString(),
                                 color = palette.gutterFg,
                                 fontFamily = theme.editorFontFamily,
@@ -650,7 +661,7 @@ private fun ComposeDiffSidePane(
                                     inlineRanges = info?.inlineRanges ?: emptyList()
                                 )
                             }
-                            Text(
+                            AppText(
                                 text = annotated,
                                 color = palette.editorFg,
                                 fontFamily = theme.editorFontFamily,
@@ -707,11 +718,46 @@ private fun ComposeBezierDividerCanvas(
     val palette = theme.palette
     val state by session.state.collectAsState()
     val presentation = remember(session) { ComposeDiffPresentation(session) }
+    var hoveredFragmentIndex by remember { mutableStateOf(-1) }
 
     Canvas(
         modifier = modifier
             .clipToBounds()
             .background(palette.dividerBg)
+            .pointerHoverIcon(if (hoveredFragmentIndex >= 0) PointerIcon.Hand else PointerIcon.Default)
+            .pointerInput(state.fragments, lineHeightPx, leftScrollPx, rightScrollPx) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        when (event.type) {
+                            PointerEventType.Move -> {
+                                val pos = event.changes.firstOrNull()?.position
+                                if (pos == null || pos.y !in 0f..size.height.toFloat()) {
+                                    hoveredFragmentIndex = -1
+                                } else {
+                                    val polygons = presentation.computeDividerPolygons(
+                                        dividerWidthPx = size.width.toFloat(),
+                                        lineHeightPx = lineHeightPx,
+                                        leftScrollYPx = leftScrollPx,
+                                        rightScrollYPx = rightScrollPx,
+                                        isDarkTheme = palette.isDark
+                                    )
+                                    val hit = polygons.firstOrNull { poly ->
+                                        val p = poly.polygon
+                                        val minY = minOf(p.startY1, p.startY2) - 4f
+                                        val maxY = maxOf(p.endY1, p.endY2) + 4f
+                                        pos.y in minY..maxY
+                                    }
+                                    hoveredFragmentIndex = hit?.fragmentIndex ?: -1
+                                }
+                            }
+                            PointerEventType.Exit -> {
+                                hoveredFragmentIndex = -1
+                            }
+                        }
+                    }
+                }
+            }
             .pointerInput(state.fragments, lineHeightPx, leftScrollPx, rightScrollPx) {
                 detectTapGestures { tapOffset ->
                     if (tapOffset.y !in 0f..size.height.toFloat()) return@detectTapGestures
@@ -749,6 +795,7 @@ private fun ComposeBezierDividerCanvas(
             for (poly in polygons) {
                 val p = poly.polygon
                 if (maxOf(p.endY1, p.endY2) < 0f || minOf(p.startY1, p.startY2) > h) continue
+                val isHovered = poly.fragmentIndex == hoveredFragmentIndex
 
                 val path = Path().apply {
                     moveTo(0f, p.startY1)
@@ -766,7 +813,13 @@ private fun ComposeBezierDividerCanvas(
                     close()
                 }
 
-                drawPath(path, color = Color(poly.fillColor.argb))
+                val baseFill = Color(poly.fillColor.argb)
+                val fillColor = if (isHovered) {
+                    baseFill.copy(alpha = (baseFill.alpha + 0.18f).coerceAtMost(0.85f))
+                } else {
+                    baseFill
+                }
+                drawPath(path, color = fillColor)
 
                 val topStroke = Path().apply {
                     moveTo(0f, p.startY1)
@@ -784,8 +837,16 @@ private fun ComposeBezierDividerCanvas(
                         p.bottomCurve.endX, p.bottomCurve.endY
                     )
                 }
-                val strokeColor = if (poly.isSelected) palette.activeFragmentBorder else Color(poly.strokeColor.argb)
-                val strokeWidth = if (poly.isSelected) 2.0f else 1.1f
+                val strokeColor = when {
+                    poly.isSelected -> palette.activeFragmentBorder
+                    isHovered -> palette.activeFragmentBorder.copy(alpha = 0.85f)
+                    else -> Color(poly.strokeColor.argb)
+                }
+                val strokeWidth = when {
+                    poly.isSelected -> 2.0f
+                    isHovered -> 1.6f
+                    else -> 1.1f
+                }
                 drawPath(topStroke, color = strokeColor, style = Stroke(width = strokeWidth))
                 drawPath(bottomStroke, color = strokeColor, style = Stroke(width = strokeWidth))
             }
@@ -801,6 +862,8 @@ private fun ComposeBezierDividerCanvas(
 private fun ComposeOverviewBarCanvas(
     fragments: List<LineFragment>,
     totalLines: Int,
+    firstVisibleLine: Int,
+    visibleLineCount: Int,
     onLineClicked: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -809,6 +872,7 @@ private fun ComposeOverviewBarCanvas(
         modifier = modifier
             .clipToBounds()
             .background(palette.gutterBg)
+            .pointerHoverIcon(PointerIcon.Hand)
             .pointerInput(totalLines) {
                 detectTapGestures { offset ->
                     if (size.height > 0) {
@@ -833,6 +897,23 @@ private fun ComposeOverviewBarCanvas(
                     size = Size(w - 4f, barH)
                 )
             }
+
+            // Sliding viewport indicator ("thumb")
+            val thumbTop = ((firstVisibleLine.coerceAtLeast(0) / denom) * h).coerceIn(0f, h)
+            val thumbHeight = ((visibleLineCount.coerceAtLeast(1) / denom) * h).coerceIn(10f, h)
+            val clampedTop = thumbTop.coerceAtMost((h - thumbHeight).coerceAtLeast(0f))
+            drawRect(
+                color = palette.editorFg.copy(alpha = if (palette.isDark) 0.16f else 0.12f),
+                topLeft = Offset(1f, clampedTop),
+                size = Size((w - 2f).coerceAtLeast(2f), thumbHeight)
+            )
+            drawRect(
+                color = palette.gutterFg.copy(alpha = 0.65f),
+                topLeft = Offset(1f, clampedTop),
+                size = Size((w - 2f).coerceAtLeast(2f), thumbHeight),
+                style = Stroke(width = 1f)
+            )
+
             drawLine(palette.gutterBorder, Offset(0f, 0f), Offset(0f, h), strokeWidth = 1f)
         }
     }
@@ -875,7 +956,7 @@ private fun ComposeUnifiedDiffPane(
                         .height(lineHeightDp)
                         .background(diffType?.let { palette.getLineBg(it) } ?: palette.gutterBg)
                 ) {
-                    Text(
+                    AppText(
                         text = if (mapping != null && mapping.leftLine >= 0) (mapping.leftLine + 1).toString() else "",
                         color = palette.gutterFg,
                         fontFamily = theme.editorFontFamily,
@@ -884,7 +965,7 @@ private fun ComposeUnifiedDiffPane(
                         modifier = Modifier.width(colWidth).padding(end = 6.dp)
                     )
                     Box(Modifier.width(1.dp).fillMaxHeight().background(palette.gutterBorder))
-                    Text(
+                    AppText(
                         text = if (mapping != null && mapping.rightLine >= 0) (mapping.rightLine + 1).toString() else "",
                         color = palette.gutterFg,
                         fontFamily = theme.editorFontFamily,
@@ -892,7 +973,7 @@ private fun ComposeUnifiedDiffPane(
                         textAlign = TextAlign.End,
                         modifier = Modifier.width(colWidth).padding(end = 6.dp)
                     )
-                    Text(
+                    AppText(
                         text = when (diffType) {
                             TextDiffType.DELETED -> "-"
                             TextDiffType.INSERTED -> "+"
@@ -922,7 +1003,7 @@ private fun ComposeUnifiedDiffPane(
                             palette = palette
                         )
                     }
-                    Text(
+                    AppText(
                         text = annotated,
                         color = palette.editorFg,
                         fontFamily = theme.editorFontFamily,

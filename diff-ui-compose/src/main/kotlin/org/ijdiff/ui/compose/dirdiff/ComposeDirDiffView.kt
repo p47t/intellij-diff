@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,9 +39,13 @@ import org.ijdiff.model.dirdiff.DirDiffLayout
 import org.ijdiff.model.dirdiff.DirDiffSession
 import org.ijdiff.model.dirdiff.DirDiffStatus
 import org.ijdiff.model.dirdiff.DirSyncAction
-import org.ijdiff.ui.compose.components.ToolbarActionButton
-import org.ijdiff.ui.compose.components.ToolbarDropdownSelector
+import org.ijdiff.ui.compose.components.AppButton
+import org.ijdiff.ui.compose.components.AppSelect
+import org.ijdiff.ui.compose.components.AppText
+import org.ijdiff.ui.compose.components.AppToolbarSeparator
+import org.ijdiff.ui.compose.components.ButtonVariant
 import org.ijdiff.ui.compose.components.VectorIconKind
+import org.ijdiff.ui.compose.theme.AppTheme
 import org.ijdiff.ui.compose.theme.LocalComposeThemeState
 import org.ijdiff.ui.compose.twoway.ComposeTwoWayDiffView
 
@@ -107,49 +110,51 @@ fun ComposeDirDiffView(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(palette.toolbarBg)
-                .padding(horizontal = 10.dp, vertical = 5.dp)
+                .padding(horizontal = AppTheme.spacing.toolbarHorizontalPadding, vertical = AppTheme.spacing.toolbarVerticalPadding)
         ) {
-            ToolbarActionButton(
+            AppButton(
                 text = "Rescan",
                 icon = VectorIconKind.REFRESH,
                 onClick = { session.scanSync() }
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(AppTheme.spacing.sm))
 
-            ToolbarDropdownSelector(
+            AppSelect(
                 selected = compareMode,
                 options = DirCompareMode.entries,
                 labelFor = { it.displayName },
                 onSelected = { session.setCompareMode(it) }
             )
-            Spacer(Modifier.width(10.dp))
 
-            ToolbarActionButton(
+            AppToolbarSeparator()
+
+            AppButton(
                 text = "* Modified",
-                active = DirDiffStatus.MODIFIED in statusFilter,
+                variant = ButtonVariant.ToolbarToggle(DirDiffStatus.MODIFIED in statusFilter),
                 onClick = { session.toggleStatusFilter(DirDiffStatus.MODIFIED) }
             )
             Spacer(Modifier.width(3.dp))
-            ToolbarActionButton(
+            AppButton(
                 text = "- Left Only",
-                active = DirDiffStatus.DELETED in statusFilter,
+                variant = ButtonVariant.ToolbarToggle(DirDiffStatus.DELETED in statusFilter),
                 onClick = { session.toggleStatusFilter(DirDiffStatus.DELETED) }
             )
             Spacer(Modifier.width(3.dp))
-            ToolbarActionButton(
+            AppButton(
                 text = "+ Right Only",
-                active = DirDiffStatus.ADDED in statusFilter,
+                variant = ButtonVariant.ToolbarToggle(DirDiffStatus.ADDED in statusFilter),
                 onClick = { session.toggleStatusFilter(DirDiffStatus.ADDED) }
             )
             Spacer(Modifier.width(3.dp))
-            ToolbarActionButton(
+            AppButton(
                 text = "= Equal",
-                active = DirDiffStatus.EQUAL in statusFilter,
+                variant = ButtonVariant.ToolbarToggle(DirDiffStatus.EQUAL in statusFilter),
                 onClick = { session.toggleStatusFilter(DirDiffStatus.EQUAL) }
             )
-            Spacer(Modifier.width(10.dp))
 
-            Text(
+            AppToolbarSeparator()
+
+            AppText(
                 text = "Filter: ",
                 color = palette.editorFg,
                 fontFamily = theme.uiFontFamily,
@@ -159,13 +164,13 @@ fun ComposeDirDiffView(
                 contentAlignment = Alignment.CenterStart,
                 modifier = Modifier
                     .width(150.dp)
-                    .height(26.dp)
-                    .background(palette.editorBg, RoundedCornerShape(4.dp))
-                    .border(1.dp, palette.buttonBorder, RoundedCornerShape(4.dp))
-                    .padding(horizontal = 8.dp)
+                    .height(AppTheme.spacing.toolbarHeight)
+                    .background(palette.editorBg, AppTheme.shapes.control)
+                    .border(1.dp, palette.buttonBorder, AppTheme.shapes.control)
+                    .padding(horizontal = AppTheme.spacing.md)
             ) {
                 if (globFilter.isEmpty()) {
-                    Text(
+                    AppText(
                         text = "*.kt; !*.tmp",
                         color = palette.gutterFg,
                         fontFamily = theme.uiFontFamily,
@@ -185,20 +190,22 @@ fun ComposeDirDiffView(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            Spacer(Modifier.width(10.dp))
 
-            ToolbarActionButton(
+            AppToolbarSeparator()
+
+            AppButton(
                 text = "Sync Selected",
                 enabled = selectedEntry != null && selectedEntry?.syncAction != DirSyncAction.SKIP,
                 onClick = {
                     selectedEntry?.let { session.synchronizeEntries(listOf(it)) }
                 }
             )
-            Spacer(Modifier.width(4.dp))
-            ToolbarActionButton(
+            Spacer(Modifier.width(AppTheme.spacing.xs))
+            val anyActionable = filteredEntries.any { it.syncAction != DirSyncAction.SKIP }
+            AppButton(
                 text = "Sync All",
-                bold = true,
-                enabled = filteredEntries.any { it.syncAction != DirSyncAction.SKIP },
+                variant = if (anyActionable) ButtonVariant.ToolbarPrimary else ButtonVariant.ToolbarDefault,
+                enabled = anyActionable,
                 onClick = {
                     val actionable = filteredEntries.filter { it.syncAction != DirSyncAction.SKIP }
                     if (actionable.isNotEmpty()) {
@@ -212,7 +219,7 @@ fun ComposeDirDiffView(
             val modCount = remember(allEntries) { allEntries.count { it.status == DirDiffStatus.MODIFIED } }
             val delCount = remember(allEntries) { allEntries.count { it.status == DirDiffStatus.DELETED } }
             val addCount = remember(allEntries) { allEntries.count { it.status == DirDiffStatus.ADDED } }
-            Text(
+            AppText(
                 text = "${filteredEntries.size} shown (Modified: $modCount, Left Only: $delCount, Right Only: $addCount)",
                 color = palette.editorFg,
                 fontFamily = theme.uiFontFamily,
@@ -252,7 +259,7 @@ fun ComposeDirDiffView(
                             .border(0.5.dp, palette.gutterBorder)
                             .padding(horizontal = 8.dp)
                     ) {
-                        Text(
+                        AppText(
                             text = "Left File",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
@@ -260,7 +267,7 @@ fun ComposeDirDiffView(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(0.38f)
                         )
-                        Text(
+                        AppText(
                             text = "Left Size",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
@@ -269,7 +276,7 @@ fun ComposeDirDiffView(
                             textAlign = TextAlign.End,
                             modifier = Modifier.width(90.dp).padding(end = 8.dp)
                         )
-                        Text(
+                        AppText(
                             text = "Action",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
@@ -278,7 +285,7 @@ fun ComposeDirDiffView(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.width(86.dp)
                         )
-                        Text(
+                        AppText(
                             text = "Right File",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
@@ -286,7 +293,7 @@ fun ComposeDirDiffView(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(0.38f).padding(start = 8.dp)
                         )
-                        Text(
+                        AppText(
                             text = "Right Size",
                             color = palette.editorFg,
                             fontFamily = theme.uiFontFamily,
@@ -320,7 +327,7 @@ fun ComposeDirDiffView(
                                     .clickable { session.selectEntry(entry) }
                                     .padding(horizontal = 8.dp)
                             ) {
-                                Text(
+                                AppText(
                                     text = if (entry.leftFile != null) entry.relativePath else "",
                                     color = palette.editorFg,
                                     fontFamily = theme.uiFontFamily,
@@ -328,7 +335,7 @@ fun ComposeDirDiffView(
                                     maxLines = 1,
                                     modifier = Modifier.weight(0.38f)
                                 )
-                                Text(
+                                AppText(
                                     text = entry.leftFile?.size?.let { formatSize(it) } ?: "",
                                     color = palette.editorFg,
                                     fontFamily = theme.uiFontFamily,
@@ -345,7 +352,7 @@ fun ComposeDirDiffView(
                                             session.setSyncAction(entry.relativePath, cycleActionFor(entry))
                                         }
                                 ) {
-                                    Text(
+                                    AppText(
                                         text = "${entry.status.symbol}  ${entry.syncAction.symbol}",
                                         color = palette.editorFg,
                                         fontFamily = theme.editorFontFamily,
@@ -353,7 +360,7 @@ fun ComposeDirDiffView(
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-                                Text(
+                                AppText(
                                     text = if (entry.rightFile != null) entry.relativePath else "",
                                     color = palette.editorFg,
                                     fontFamily = theme.uiFontFamily,
@@ -361,7 +368,7 @@ fun ComposeDirDiffView(
                                     maxLines = 1,
                                     modifier = Modifier.weight(0.38f).padding(start = 8.dp)
                                 )
-                                Text(
+                                AppText(
                                     text = entry.rightFile?.size?.let { formatSize(it) } ?: "",
                                     color = palette.editorFg,
                                     fontFamily = theme.uiFontFamily,
@@ -392,7 +399,7 @@ fun ComposeDirDiffView(
                             selectedEntry?.isBinary == true -> "Binary file (${selectedEntry?.relativePath}) - cannot display text diff"
                             else -> "No preview available"
                         }
-                        Text(
+                        AppText(
                             text = msg,
                             color = palette.gutterFg,
                             fontFamily = theme.uiFontFamily,

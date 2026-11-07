@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -44,11 +43,15 @@ import org.ijdiff.model.dirdiff.DirDiffSession
 import org.ijdiff.model.document.DiffDocument
 import org.ijdiff.model.twoway.DiffViewMode
 import org.ijdiff.model.twoway.TwoWayDiffSession
+import org.ijdiff.ui.compose.components.AppButton
+import org.ijdiff.ui.compose.components.AppDialog
+import org.ijdiff.ui.compose.components.AppSelect
+import org.ijdiff.ui.compose.components.AppText
+import org.ijdiff.ui.compose.components.ButtonVariant
 import org.ijdiff.ui.compose.components.ComposeVectorIcon
-import org.ijdiff.ui.compose.components.ToolbarActionButton
-import org.ijdiff.ui.compose.components.ToolbarDropdownSelector
 import org.ijdiff.ui.compose.components.VectorIconKind
 import org.ijdiff.ui.compose.dirdiff.ComposeDirDiffView
+import org.ijdiff.ui.compose.theme.AppTheme
 import org.ijdiff.ui.compose.theme.ComposeAppTheme
 import org.ijdiff.ui.compose.theme.ComposeThemeState
 import org.ijdiff.ui.compose.theme.ProvideComposeDiffTheme
@@ -220,39 +223,39 @@ fun ComposeMainScreen(
                         .fillMaxWidth()
                         .background(palette.toolbarBg)
                         .border(0.5.dp, palette.gutterBorder)
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = AppTheme.spacing.toolbarHorizontalPadding, vertical = AppTheme.spacing.sm)
                 ) {
-                    ToolbarActionButton(
+                    AppButton(
                         text = "Compare Paths...",
                         onClick = { showCompareModal = true }
                     )
-                    Spacer(Modifier.width(6.dp))
-                    ToolbarActionButton(
+                    Spacer(Modifier.width(AppTheme.spacing.sm))
+                    AppButton(
                         text = "+ Scratch Diff",
                         onClick = { controller.openBlankScratchDiff() }
                     )
-                    Spacer(Modifier.width(6.dp))
-                    ToolbarActionButton(
+                    Spacer(Modifier.width(AppTheme.spacing.sm))
+                    AppButton(
                         text = "Load Sample Suite",
                         onClick = { controller.loadAllBuiltInSamples() }
                     )
 
                     Spacer(Modifier.weight(1f))
 
-                    ToolbarActionButton(
+                    AppButton(
                         text = "Fonts: ${themeState.editorFontFamilyName} (${themeState.editorFontSizePt}pt) | UI: ${themeState.uiFontFamilyName} (${themeState.uiFontSizePt}pt)",
-                        active = showFontDialog,
+                        variant = ButtonVariant.ToolbarToggle(showFontDialog),
                         onClick = { showFontDialog = !showFontDialog }
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(AppTheme.spacing.md))
 
-                    Text(
+                    AppText(
                         text = "Theme: ",
                         color = palette.editorFg,
                         fontFamily = themeState.uiFontFamily,
                         fontSize = (themeState.uiFontSizePt - 1).coerceAtLeast(10).sp
                     )
-                    ToolbarDropdownSelector(
+                    AppSelect(
                         selected = themeState.theme,
                         options = ComposeAppTheme.entries,
                         labelFor = { it.displayName },
@@ -271,7 +274,7 @@ fun ComposeMainScreen(
                             .background(palette.gutterBg)
                             .border(0.5.dp, palette.gutterBorder)
                             .horizontalScroll(tabScroll)
-                            .padding(horizontal = 6.dp)
+                            .padding(horizontal = AppTheme.spacing.sm)
                     ) {
                         for (tab in controller.tabs) {
                             val isSelected = tab.id == controller.activeTabId
@@ -282,17 +285,17 @@ fun ComposeMainScreen(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .height(26.dp)
-                                    .padding(end = 4.dp)
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .height(AppTheme.spacing.toolbarHeight)
+                                    .padding(end = AppTheme.spacing.xs)
+                                    .clip(AppTheme.shapes.tab)
                                     .background(tabBg)
                                     .border(
                                         width = 1.dp,
                                         color = if (isSelected) palette.accentBlue else palette.buttonBorder,
-                                        shape = RoundedCornerShape(4.dp)
+                                        shape = AppTheme.shapes.tab
                                     )
                                     .clickable { controller.activeTabId = tab.id }
-                                    .padding(horizontal = 8.dp)
+                                    .padding(horizontal = AppTheme.spacing.md)
                             ) {
                                 if (tab is ComposeDiffTab.DirectoryTab) {
                                     ComposeVectorIcon(
@@ -302,7 +305,7 @@ fun ComposeMainScreen(
                                     )
                                     Spacer(Modifier.width(5.dp))
                                 }
-                                Text(
+                                AppText(
                                     text = label,
                                     color = palette.editorFg,
                                     fontFamily = themeState.uiFontFamily,
@@ -310,7 +313,7 @@ fun ComposeMainScreen(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     maxLines = 1
                                 )
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(Modifier.width(AppTheme.spacing.sm))
                                 Box(
                                     contentAlignment = Alignment.Center,
                                     modifier = Modifier
@@ -353,7 +356,7 @@ fun ComposeMainScreen(
                         }
                     } else {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text(
+                            AppText(
                                 text = "No open comparisons. Click '+ Scratch Diff' or 'Load Sample Suite' above.",
                                 color = palette.gutterFg,
                                 fontFamily = themeState.uiFontFamily,
@@ -387,63 +390,41 @@ fun ComposeMainScreen(
             // Unsaved Changes Confirmation Modal
             val tabToConfirm = pendingCloseTab
             if (tabToConfirm != null) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .width(420.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(palette.toolbarBg)
-                            .border(1.dp, palette.buttonBorder, RoundedCornerShape(6.dp))
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Unsaved Changes",
-                            color = palette.editorFg,
-                            fontFamily = themeState.uiFontFamily,
-                            fontSize = (themeState.uiFontSizePt + 1).sp,
-                            fontWeight = FontWeight.Bold
+                AppDialog(
+                    title = "Unsaved Changes",
+                    width = 420.dp,
+                    onDismissRequest = { pendingCloseTab = null },
+                    actions = {
+                        AppButton(
+                            text = "Save & Close",
+                            variant = ButtonVariant.ToolbarPrimary,
+                            onClick = {
+                                tabToConfirm.session.saveAll()
+                                controller.closeTab(tabToConfirm.id)
+                                pendingCloseTab = null
+                            }
                         )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "Tab '${tabToConfirm.baseTitle}' has unsaved changes. Save before closing?",
-                            color = palette.editorFg,
-                            fontFamily = themeState.uiFontFamily,
-                            fontSize = themeState.uiFontSizePt.sp
+                        Spacer(Modifier.width(AppTheme.spacing.sm))
+                        AppButton(
+                            text = "Discard",
+                            onClick = {
+                                controller.closeTab(tabToConfirm.id)
+                                pendingCloseTab = null
+                            }
                         )
-                        Spacer(Modifier.height(14.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.End,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            ToolbarActionButton(
-                                text = "Save & Close",
-                                bold = true,
-                                onClick = {
-                                    tabToConfirm.session.saveAll()
-                                    controller.closeTab(tabToConfirm.id)
-                                    pendingCloseTab = null
-                                }
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            ToolbarActionButton(
-                                text = "Discard",
-                                onClick = {
-                                    controller.closeTab(tabToConfirm.id)
-                                    pendingCloseTab = null
-                                }
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            ToolbarActionButton(
-                                text = "Cancel",
-                                onClick = { pendingCloseTab = null }
-                            )
-                        }
+                        Spacer(Modifier.width(AppTheme.spacing.sm))
+                        AppButton(
+                            text = "Cancel",
+                            onClick = { pendingCloseTab = null }
+                        )
                     }
+                ) {
+                    AppText(
+                        text = "Tab '${tabToConfirm.baseTitle}' has unsaved changes. Save before closing?",
+                        color = palette.editorFg,
+                        fontFamily = themeState.uiFontFamily,
+                        fontSize = themeState.uiFontSizePt.sp
+                    )
                 }
             }
         }
@@ -462,95 +443,71 @@ private fun ComposeFontConfigModal(
     var uiFamily by remember { mutableStateOf(themeState.uiFontFamilyName) }
     var uiSizeStr by remember { mutableStateOf(themeState.uiFontSizePt.toString()) }
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f))
-    ) {
-        Column(
-            modifier = Modifier
-                .width(460.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(palette.toolbarBg)
-                .border(1.dp, palette.buttonBorder, RoundedCornerShape(6.dp))
-                .padding(16.dp)
-        ) {
-            Text(
-                text = "Editor & UI Font Configuration (Compose)",
-                color = palette.editorFg,
-                fontFamily = themeState.uiFontFamily,
-                fontSize = (themeState.uiFontSizePt + 1).sp,
-                fontWeight = FontWeight.Bold
+    fun applyChanges(saveToDisk: Boolean) {
+        val eFam = editorFamily.trim().ifEmpty { themeState.editorFontFamilyName }
+        val eSize = (editorSizeStr.toIntOrNull() ?: themeState.editorFontSizePt)
+            .coerceIn(IjDiffConfig.MIN_FONT_SIZE, IjDiffConfig.MAX_FONT_SIZE)
+        val uFam = uiFamily.trim().ifEmpty { themeState.uiFontFamilyName }
+        val uSize = (uiSizeStr.toIntOrNull() ?: themeState.uiFontSizePt)
+            .coerceIn(IjDiffConfig.MIN_FONT_SIZE, IjDiffConfig.MAX_FONT_SIZE)
+
+        themeState.editorFontFamilyName = eFam
+        themeState.editorFontSizePt = eSize
+        themeState.uiFontFamilyName = uFam
+        themeState.uiFontSizePt = uSize
+
+        if (saveToDisk) {
+            val existing = IjDiffConfig.load(configPath)
+            val updated = existing.copy(
+                fontFamily = eFam,
+                fontSize = eSize,
+                uiFontFamily = uFam,
+                uiFontSize = uSize,
+                theme = if (themeState.theme.isDark) "dark" else "light",
+                sourcePath = configPath
             )
-            Spacer(Modifier.height(12.dp))
-
-            ModalInputRow("Editor Font ([font] family):", editorFamily) { editorFamily = it }
-            Spacer(Modifier.height(8.dp))
-            ModalInputRow("Editor Size ([font] size):", editorSizeStr) { editorSizeStr = it }
-            Spacer(Modifier.height(8.dp))
-            ModalInputRow("UI Font ([ui.font] family):", uiFamily) { uiFamily = it }
-            Spacer(Modifier.height(8.dp))
-            ModalInputRow("UI Size ([ui.font] size):", uiSizeStr) { uiSizeStr = it }
-            Spacer(Modifier.height(10.dp))
-
-            Text(
-                text = "TOML Config: $configPath",
-                color = palette.gutterFg,
-                fontFamily = themeState.uiFontFamily,
-                fontSize = (themeState.uiFontSizePt - 1).coerceAtLeast(10).sp
-            )
-            Spacer(Modifier.height(14.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                fun applyChanges(saveToDisk: Boolean) {
-                    val eFam = editorFamily.trim().ifEmpty { themeState.editorFontFamilyName }
-                    val eSize = (editorSizeStr.toIntOrNull() ?: themeState.editorFontSizePt)
-                        .coerceIn(IjDiffConfig.MIN_FONT_SIZE, IjDiffConfig.MAX_FONT_SIZE)
-                    val uFam = uiFamily.trim().ifEmpty { themeState.uiFontFamilyName }
-                    val uSize = (uiSizeStr.toIntOrNull() ?: themeState.uiFontSizePt)
-                        .coerceIn(IjDiffConfig.MIN_FONT_SIZE, IjDiffConfig.MAX_FONT_SIZE)
-
-                    themeState.editorFontFamilyName = eFam
-                    themeState.editorFontSizePt = eSize
-                    themeState.uiFontFamilyName = uFam
-                    themeState.uiFontSizePt = uSize
-
-                    if (saveToDisk) {
-                        val existing = IjDiffConfig.load(configPath)
-                        val updated = existing.copy(
-                            fontFamily = eFam,
-                            fontSize = eSize,
-                            uiFontFamily = uFam,
-                            uiFontSize = uSize,
-                            theme = if (themeState.theme.isDark) "dark" else "light",
-                            sourcePath = configPath
-                        )
-                        runCatching { IjDiffConfig.save(updated, configPath) }
-                    }
-                    onClose()
-                }
-
-                ToolbarActionButton(
-                    text = "Apply & Save to Config",
-                    bold = true,
-                    onClick = { applyChanges(saveToDisk = true) }
-                )
-                Spacer(Modifier.width(6.dp))
-                ToolbarActionButton(
-                    text = "Apply Only",
-                    onClick = { applyChanges(saveToDisk = false) }
-                )
-                Spacer(Modifier.width(6.dp))
-                ToolbarActionButton(
-                    text = "Cancel",
-                    onClick = onClose
-                )
-            }
+            runCatching { IjDiffConfig.save(updated, configPath) }
         }
+        onClose()
+    }
+
+    AppDialog(
+        title = "Editor & UI Font Configuration (Compose)",
+        width = 460.dp,
+        onDismissRequest = onClose,
+        actions = {
+            AppButton(
+                text = "Apply & Save to Config",
+                variant = ButtonVariant.ToolbarPrimary,
+                onClick = { applyChanges(saveToDisk = true) }
+            )
+            Spacer(Modifier.width(AppTheme.spacing.sm))
+            AppButton(
+                text = "Apply Only",
+                onClick = { applyChanges(saveToDisk = false) }
+            )
+            Spacer(Modifier.width(AppTheme.spacing.sm))
+            AppButton(
+                text = "Cancel",
+                onClick = onClose
+            )
+        }
+    ) {
+        ModalInputRow("Editor Font ([font] family):", editorFamily) { editorFamily = it }
+        Spacer(Modifier.height(AppTheme.spacing.md))
+        ModalInputRow("Editor Size ([font] size):", editorSizeStr) { editorSizeStr = it }
+        Spacer(Modifier.height(AppTheme.spacing.md))
+        ModalInputRow("UI Font ([ui.font] family):", uiFamily) { uiFamily = it }
+        Spacer(Modifier.height(AppTheme.spacing.md))
+        ModalInputRow("UI Size ([ui.font] size):", uiSizeStr) { uiSizeStr = it }
+        Spacer(Modifier.height(10.dp))
+
+        AppText(
+            text = "TOML Config: $configPath",
+            color = palette.gutterFg,
+            fontFamily = themeState.uiFontFamily,
+            fontSize = (themeState.uiFontSizePt - 1).coerceAtLeast(10).sp
+        )
     }
 }
 
@@ -565,63 +522,40 @@ private fun ComposeComparePathsModal(
     var rightPathStr by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f))
-    ) {
-        Column(
-            modifier = Modifier
-                .width(500.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(palette.toolbarBg)
-                .border(1.dp, palette.buttonBorder, RoundedCornerShape(6.dp))
-                .padding(16.dp)
-        ) {
-            Text(
-                text = "Compare Files or Folders",
-                color = palette.editorFg,
-                fontFamily = themeState.uiFontFamily,
-                fontSize = (themeState.uiFontSizePt + 1).sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(12.dp))
-            ModalInputRow("Left Path:", leftPathStr) { leftPathStr = it }
-            Spacer(Modifier.height(8.dp))
-            ModalInputRow("Right Path:", rightPathStr) { rightPathStr = it }
-
-            if (errorMsg != null) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = errorMsg!!,
-                    color = palette.deletedBorder,
-                    fontFamily = themeState.uiFontFamily,
-                    fontSize = (themeState.uiFontSizePt - 1).coerceAtLeast(10).sp
-                )
-            }
-
-            Spacer(Modifier.height(14.dp))
-            Row(
-                horizontalArrangement = Arrangement.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                ToolbarActionButton(
-                    text = "Compare",
-                    bold = true,
-                    onClick = {
-                        val p1 = Path.of(leftPathStr.trim())
-                        val p2 = Path.of(rightPathStr.trim())
-                        if (!p1.exists() || !p2.exists()) {
-                            errorMsg = "Both paths must exist on disk."
-                        } else {
-                            onCompare(p1, p2)
-                        }
+    AppDialog(
+        title = "Compare Files or Folders",
+        width = 500.dp,
+        onDismissRequest = onCancel,
+        actions = {
+            AppButton(
+                text = "Compare",
+                variant = ButtonVariant.ToolbarPrimary,
+                onClick = {
+                    val p1 = Path.of(leftPathStr.trim())
+                    val p2 = Path.of(rightPathStr.trim())
+                    if (!p1.exists() || !p2.exists()) {
+                        errorMsg = "Both paths must exist on disk."
+                    } else {
+                        onCompare(p1, p2)
                     }
-                )
-                Spacer(Modifier.width(6.dp))
-                ToolbarActionButton(text = "Cancel", onClick = onCancel)
-            }
+                }
+            )
+            Spacer(Modifier.width(AppTheme.spacing.sm))
+            AppButton(text = "Cancel", onClick = onCancel)
+        }
+    ) {
+        ModalInputRow("Left Path:", leftPathStr) { leftPathStr = it }
+        Spacer(Modifier.height(AppTheme.spacing.md))
+        ModalInputRow("Right Path:", rightPathStr) { rightPathStr = it }
+
+        if (errorMsg != null) {
+            Spacer(Modifier.height(AppTheme.spacing.md))
+            AppText(
+                text = errorMsg!!,
+                color = palette.deletedBorder,
+                fontFamily = themeState.uiFontFamily,
+                fontSize = (themeState.uiFontSizePt - 1).coerceAtLeast(10).sp
+            )
         }
     }
 }
@@ -638,7 +572,7 @@ private fun ModalInputRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text(
+        AppText(
             text = label,
             color = palette.editorFg,
             fontFamily = theme.uiFontFamily,
@@ -650,9 +584,9 @@ private fun ModalInputRow(
             modifier = Modifier
                 .weight(1f)
                 .height(28.dp)
-                .background(palette.editorBg, RoundedCornerShape(4.dp))
-                .border(1.dp, palette.buttonBorder, RoundedCornerShape(4.dp))
-                .padding(horizontal = 8.dp)
+                .background(palette.editorBg, AppTheme.shapes.control)
+                .border(1.dp, palette.buttonBorder, AppTheme.shapes.control)
+                .padding(horizontal = AppTheme.spacing.md)
         ) {
             BasicTextField(
                 value = value,
