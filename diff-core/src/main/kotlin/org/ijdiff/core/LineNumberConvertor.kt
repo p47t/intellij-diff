@@ -64,7 +64,7 @@ class LineNumberConvertor private constructor(
                 if (chunk.length1 == chunk.length2) {
                     return chunk.start2 + (line1 - chunk.start1)
                 }
-                return chunk.start2 + min(line1 - chunk.start1, chunk.length2)
+                return chunk.start2 + ((line1 - chunk.start1) * chunk.length2) / chunk.length1
             }
         }
         val last = fragments.lastOrNull() ?: return line1
@@ -82,11 +82,63 @@ class LineNumberConvertor private constructor(
                 if (chunk.length1 == chunk.length2) {
                     return chunk.start1 + (line2 - chunk.start2)
                 }
-                return chunk.start1 + min(line2 - chunk.start2, chunk.length1)
+                return chunk.start1 + ((line2 - chunk.start2) * chunk.length1) / chunk.length2
             }
         }
         val last = fragments.lastOrNull() ?: return line2
         return last.start1 + last.length1 + (line2 - (last.start2 + last.length2))
+    }
+
+    /**
+     * Smooth, strictly monotonic pixel-level scroll conversion from left pane (`scrollY1`) to right pane (`scrollY2`).
+     * Prevents sub-line offset wrap-around when scrolling up by small deltas across asymmetric diff blocks.
+     */
+    fun convertApproximatePixel1(scrollY1: Float, lineHeightPx: Float): Float {
+        if (scrollY1 <= 0f || lineHeightPx <= 0f) return 0f
+        for (chunk in fragments) {
+            val startY1 = chunk.start1 * lineHeightPx
+            val endY1 = (chunk.start1 + chunk.length1) * lineHeightPx
+            val startY2 = chunk.start2 * lineHeightPx
+            val endY2 = (chunk.start2 + chunk.length2) * lineHeightPx
+            if (scrollY1 < startY1) return startY2
+            if (scrollY1 < endY1) {
+                if (chunk.length1 == chunk.length2) {
+                    return startY2 + (scrollY1 - startY1)
+                }
+                val fraction = (scrollY1 - startY1) / (endY1 - startY1)
+                return startY2 + fraction * (endY2 - startY2)
+            }
+        }
+        val last = fragments.lastOrNull() ?: return scrollY1
+        val lastEndY1 = (last.start1 + last.length1) * lineHeightPx
+        val lastEndY2 = (last.start2 + last.length2) * lineHeightPx
+        return lastEndY2 + (scrollY1 - lastEndY1)
+    }
+
+    /**
+     * Smooth, strictly monotonic pixel-level scroll conversion from right pane (`scrollY2`) to left pane (`scrollY1`).
+     * Prevents sub-line offset wrap-around when scrolling up by small deltas across asymmetric diff blocks.
+     */
+    fun convertApproximatePixelInv1(scrollY2: Float, lineHeightPx: Float): Float {
+        if (scrollY2 <= 0f || lineHeightPx <= 0f) return 0f
+        for (chunk in fragments) {
+            val startY1 = chunk.start1 * lineHeightPx
+            val endY1 = (chunk.start1 + chunk.length1) * lineHeightPx
+            val startY2 = chunk.start2 * lineHeightPx
+            val endY2 = (chunk.start2 + chunk.length2) * lineHeightPx
+            if (scrollY2 < startY2) return startY1
+            if (scrollY2 < endY2) {
+                if (chunk.length1 == chunk.length2) {
+                    return startY1 + (scrollY2 - startY2)
+                }
+                val fraction = (scrollY2 - startY2) / (endY2 - startY2)
+                return startY1 + fraction * (endY1 - startY1)
+            }
+        }
+        val last = fragments.lastOrNull() ?: return scrollY2
+        val lastEndY1 = (last.start1 + last.length1) * lineHeightPx
+        val lastEndY2 = (last.start2 + last.length2) * lineHeightPx
+        return lastEndY1 + (scrollY2 - lastEndY2)
     }
 
     class Builder {

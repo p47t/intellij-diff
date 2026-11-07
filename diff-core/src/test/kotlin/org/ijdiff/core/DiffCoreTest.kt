@@ -145,11 +145,27 @@ class DiffCoreTest {
         // Lines 1..2 on left were replaced by line 1 on right
         assertEquals(-1, convertor.convert1(1))
         assertEquals(1, convertor.convertApproximate1(1))
-        assertEquals(2, convertor.convertApproximate1(2))
+        assertEquals(1, convertor.convertApproximate1(2))
+        assertEquals(2, convertor.convertApproximate1(3))
 
         // Line 3 on left == Line 2 on right
         assertEquals(2, convertor.convert1(3))
         assertEquals(3, convertor.convertInv1(2))
+
+        // Scrolling UP by small pixel offsets across the asymmetric diff block is strictly monotonic
+        val lineHeight = 20f
+        var prevRightY = convertor.convertApproximatePixel1(3 * lineHeight, lineHeight)
+        assertEquals(2 * lineHeight, prevRightY)
+        for (leftPx in (3 * 20 - 1) downTo 0) {
+            val curRightY = convertor.convertApproximatePixel1(leftPx.toFloat(), lineHeight)
+            assertTrue(
+                curRightY <= prevRightY,
+                "Expected monotonic upward scroll at leftPx=$leftPx: curRightY=$curRightY, prevRightY=$prevRightY"
+            )
+            prevRightY = curRightY
+        }
+        // Directly above line 3 (e.g. leftPx = 58, 2px scroll up), rightY must already move up into line 1 (< 40f)
+        assertTrue(convertor.convertApproximatePixel1(58f, lineHeight) < 2 * lineHeight)
     }
 
     @Test

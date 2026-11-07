@@ -37,6 +37,7 @@ import javax.swing.JToolBar
 import javax.swing.KeyStroke
 import javax.swing.Timer
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Full 2-Way Diff Viewer component (Side-by-Side + Unified views) with synchronized scrolling,
@@ -48,6 +49,8 @@ class TwoWayDiffPanel(
 ) : JPanel(BorderLayout()) {
 
     private var syncingScroll = false
+    private var lastLeftScrollY = -1
+    private var lastRightScrollY = -1
 
     val leftEditorPane = DiffEditorPane(
         side = EditorSide.LEFT,
@@ -378,18 +381,21 @@ class TwoWayDiffPanel(
     private fun setupSynchronizedScrolling() {
         leftEditorPane.scrollPane.viewport.addChangeListener {
             dividerComponent.repaint()
-            if (syncingScroll) return@addChangeListener
+            val leftPos = leftEditorPane.scrollPane.viewport.viewPosition
+            if (syncingScroll || leftPos.y == lastLeftScrollY) return@addChangeListener
+            lastLeftScrollY = leftPos.y
             syncingScroll = true
             try {
                 val lineHeight = leftEditorPane.textArea.lineHeight.coerceAtLeast(16)
-                val leftPos = leftEditorPane.scrollPane.viewport.viewPosition
-                val anchorLine1 = leftPos.y / lineHeight
-                val subLinePixelOffset = leftPos.y % lineHeight
-                val anchorLine2 = session.state.value.lineConvertor.convertApproximate1(anchorLine1)
-                val targetY = (anchorLine2 * lineHeight + subLinePixelOffset).coerceAtLeast(0)
+                val targetY = session.state.value.lineConvertor.convertApproximatePixel1(
+                    leftPos.y.toFloat(),
+                    lineHeight.toFloat()
+                ).roundToInt().coerceAtLeast(0)
                 val rightViewport = rightEditorPane.scrollPane.viewport
                 val maxRightY = (rightEditorPane.textArea.height - rightViewport.extentSize.height).coerceAtLeast(0)
-                rightViewport.viewPosition = java.awt.Point(rightViewport.viewPosition.x, targetY.coerceAtMost(maxRightY))
+                val clampedRightY = targetY.coerceAtMost(maxRightY)
+                lastRightScrollY = clampedRightY
+                rightViewport.viewPosition = java.awt.Point(rightViewport.viewPosition.x, clampedRightY)
             } finally {
                 syncingScroll = false
             }
@@ -397,18 +403,21 @@ class TwoWayDiffPanel(
 
         rightEditorPane.scrollPane.viewport.addChangeListener {
             dividerComponent.repaint()
-            if (syncingScroll) return@addChangeListener
+            val rightPos = rightEditorPane.scrollPane.viewport.viewPosition
+            if (syncingScroll || rightPos.y == lastRightScrollY) return@addChangeListener
+            lastRightScrollY = rightPos.y
             syncingScroll = true
             try {
                 val lineHeight = rightEditorPane.textArea.lineHeight.coerceAtLeast(16)
-                val rightPos = rightEditorPane.scrollPane.viewport.viewPosition
-                val anchorLine2 = rightPos.y / lineHeight
-                val subLinePixelOffset = rightPos.y % lineHeight
-                val anchorLine1 = session.state.value.lineConvertor.convertApproximateInv1(anchorLine2)
-                val targetY = (anchorLine1 * lineHeight + subLinePixelOffset).coerceAtLeast(0)
+                val targetY = session.state.value.lineConvertor.convertApproximatePixelInv1(
+                    rightPos.y.toFloat(),
+                    lineHeight.toFloat()
+                ).roundToInt().coerceAtLeast(0)
                 val leftViewport = leftEditorPane.scrollPane.viewport
                 val maxLeftY = (leftEditorPane.textArea.height - leftViewport.extentSize.height).coerceAtLeast(0)
-                leftViewport.viewPosition = java.awt.Point(leftViewport.viewPosition.x, targetY.coerceAtMost(maxLeftY))
+                val clampedLeftY = targetY.coerceAtMost(maxLeftY)
+                lastLeftScrollY = clampedLeftY
+                leftViewport.viewPosition = java.awt.Point(leftViewport.viewPosition.x, clampedLeftY)
             } finally {
                 syncingScroll = false
             }

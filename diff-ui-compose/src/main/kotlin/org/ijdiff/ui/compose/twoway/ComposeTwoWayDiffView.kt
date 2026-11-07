@@ -84,6 +84,7 @@ import org.ijdiff.ui.compose.syntax.ComposeSyntaxHighlighter
 import org.ijdiff.ui.compose.theme.AppTheme
 import org.ijdiff.ui.compose.theme.LocalComposeThemeState
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Phase 2 Compose Multiplatform Desktop 2-Way Diff Viewer (`Side-by-Side` & `Unified`).
@@ -116,56 +117,85 @@ fun ComposeTwoWayDiffView(
 
     val lineHeightDp: Dp = (theme.editorFontSizePt + 7).dp
     val density = LocalDensity.current
-    val lineHeightPx = with(density) { lineHeightDp.toPx().coerceAtLeast(16f) }
+    val lineHeightInt = with(density) { lineHeightDp.roundToPx().coerceAtLeast(16) }
+    val lineHeightPx = lineHeightInt.toFloat()
 
     val leftScrollPx = leftListState.firstVisibleItemIndex * lineHeightPx + leftListState.firstVisibleItemScrollOffset
     val rightScrollPx = rightListState.firstVisibleItemIndex * lineHeightPx + rightListState.firstVisibleItemScrollOffset
 
-    // Synchronize left -> right scroll via LineNumberConvertor
-    var syncingFromLeft by remember { mutableStateOf(false) }
-    var syncingFromRight by remember { mutableStateOf(false) }
+    // Synchronize left <-> right scroll via LineNumberConvertor without ping-pong feedback
+    val syncTracker = remember {
+        object {
+            var lastSyncedLeftIndex = -1
+            var lastSyncedLeftOffset = -1
+            var lastSyncedRightIndex = -1
+            var lastSyncedRightOffset = -1
+        }
+    }
 
     LaunchedEffect(leftListState.firstVisibleItemIndex, leftListState.firstVisibleItemScrollOffset) {
-        if (syncingFromRight) return@LaunchedEffect
-        syncingFromLeft = true
-        try {
-            val anchorLine1 = leftListState.firstVisibleItemIndex
-            val subLineOffset = leftListState.firstVisibleItemScrollOffset
-            val anchorLine2 = state.lineConvertor.convertApproximate1(anchorLine1).coerceAtLeast(0)
-            if (rightListState.firstVisibleItemIndex != anchorLine2 ||
-                kotlin.math.abs(rightListState.firstVisibleItemScrollOffset - subLineOffset) > 2
-            ) {
-                rightListState.scrollToItem(anchorLine2, subLineOffset)
-            }
-        } finally {
-            syncingFromLeft = false
+        val curLeftIdx = leftListState.firstVisibleItemIndex
+        val curLeftOff = leftListState.firstVisibleItemScrollOffset
+        if (curLeftIdx == syncTracker.lastSyncedLeftIndex && curLeftOff == syncTracker.lastSyncedLeftOffset) {
+            syncTracker.lastSyncedLeftIndex = -1
+            syncTracker.lastSyncedLeftOffset = -1
+            return@LaunchedEffect
+        }
+        if (rightListState.isScrollInProgress && !leftListState.isScrollInProgress) {
+            return@LaunchedEffect
+        }
+        val leftY = curLeftIdx * lineHeightPx + curLeftOff
+        val targetRightPx = state.lineConvertor
+            .convertApproximatePixel1(leftY, lineHeightPx)
+            .coerceAtLeast(0f)
+            .roundToInt()
+        val anchorLine2 = targetRightPx / lineHeightInt
+        val subLineOffset2 = targetRightPx % lineHeightInt
+        if (rightListState.firstVisibleItemIndex != anchorLine2 ||
+            rightListState.firstVisibleItemScrollOffset != subLineOffset2
+        ) {
+            rightListState.scrollToItem(anchorLine2, subLineOffset2)
+            syncTracker.lastSyncedRightIndex = rightListState.firstVisibleItemIndex
+            syncTracker.lastSyncedRightOffset = rightListState.firstVisibleItemScrollOffset
         }
     }
 
     LaunchedEffect(rightListState.firstVisibleItemIndex, rightListState.firstVisibleItemScrollOffset) {
-        if (syncingFromLeft) return@LaunchedEffect
-        syncingFromRight = true
-        try {
-            val anchorLine2 = rightListState.firstVisibleItemIndex
-            val subLineOffset = rightListState.firstVisibleItemScrollOffset
-            val anchorLine1 = state.lineConvertor.convertApproximateInv1(anchorLine2).coerceAtLeast(0)
-            if (leftListState.firstVisibleItemIndex != anchorLine1 ||
-                kotlin.math.abs(leftListState.firstVisibleItemScrollOffset - subLineOffset) > 2
-            ) {
-                leftListState.scrollToItem(anchorLine1, subLineOffset)
-            }
-        } finally {
-            syncingFromRight = false
+        val curRightIdx = rightListState.firstVisibleItemIndex
+        val curRightOff = rightListState.firstVisibleItemScrollOffset
+        if (curRightIdx == syncTracker.lastSyncedRightIndex && curRightOff == syncTracker.lastSyncedRightOffset) {
+            syncTracker.lastSyncedRightIndex = -1
+            syncTracker.lastSyncedRightOffset = -1
+            return@LaunchedEffect
+        }
+        if (leftListState.isScrollInProgress && !rightListState.isScrollInProgress) {
+            return@LaunchedEffect
+        }
+        val rightY = curRightIdx * lineHeightPx + curRightOff
+        val targetLeftPx = state.lineConvertor
+            .convertApproximatePixelInv1(rightY, lineHeightPx)
+            .coerceAtLeast(0f)
+            .roundToInt()
+        val anchorLine1 = targetLeftPx / lineHeightInt
+        val subLineOffset1 = targetLeftPx % lineHeightInt
+        if (leftListState.firstVisibleItemIndex != anchorLine1 ||
+            leftListState.firstVisibleItemScrollOffset != subLineOffset1
+        ) {
+            leftListState.scrollToItem(anchorLine1, subLineOffset1)
+            syncTracker.lastSyncedLeftIndex = leftListState.firstVisibleItemIndex
+            syncTracker.lastSyncedLeftOffset = leftListState.firstVisibleItemScrollOffset
         }
     }
 
     fun scrollToFragment(fragment: LineFragment) {
         scope.launch {
-            val targetLine = (fragment.startLine1 - 3).coerceAtLeast(0)
             if (viewMode == DiffViewMode.UNIFIED) {
-                unifiedListState.animateScrollToItem(targetLine)
+                val blockIdx = state.fragments.indexOf(fragment)
+                val uLine = state.unifiedResult.blocks.getOrNull(blockIdx)?.startLine ?: fragment.startLine1
+                unifiedListState.animateScrollToItem((uLine - 3).coerceAtLeast(0), 0)
             } else {
-                leftListState.animateScrollToItem(targetLine)
+                val targetLine = (fragment.startLine1 - 3).coerceAtLeast(0)
+                leftListState.animateScrollToItem(targetLine, 0)
             }
         }
     }
