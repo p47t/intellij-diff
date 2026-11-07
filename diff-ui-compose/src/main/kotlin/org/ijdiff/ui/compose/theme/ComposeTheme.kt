@@ -76,13 +76,13 @@ data class ComposeDiffColorPalette(
         val DARK = ComposeDiffColorPalette(
             isDark = true,
             appBg = Color(0xFF2B2D30),
-            toolbarBg = Color(0xFF3C3F41),
+            toolbarBg = Color(0xFF2B2D30),
             editorBg = Color(0xFF1E1F22),
             editorFg = Color(0xFFBCBEC4),
             gutterBg = Color(0xFF2B2D30),
             gutterFg = Color(0xFF6F737A),
             gutterBorder = Color(0xFF393B40),
-            dividerBg = Color(0xFF26282C),
+            dividerBg = Color(0xFF25272A),
             insertedLineBg = Color(0xFF233B29),
             insertedWordBg = Color(0xFF33633E),
             insertedBorder = Color(0xFF437A4F),
@@ -93,15 +93,15 @@ data class ComposeDiffColorPalette(
             modifiedWordBg = Color(0xFF345280),
             modifiedBorder = Color(0xFF466DA6),
             activeFragmentBorder = Color(0xFF548AF7),
-            buttonBg = Color(0xFF4C5052),
-            buttonBorder = Color(0xFF5E6060),
+            buttonBg = Color(0xFF393B40),
+            buttonBorder = Color(0xFF43454A),
             accentBlue = Color(0xFF3574F0)
         )
 
         val LIGHT = ComposeDiffColorPalette(
             isDark = false,
-            appBg = Color(0xFFF2F2F2),
-            toolbarBg = Color(0xFFEBECF0),
+            appBg = Color(0xFFF7F8FA),
+            toolbarBg = Color(0xFFF7F8FA),
             editorBg = Color(0xFFFFFFFF),
             editorFg = Color(0xFF080808),
             gutterBg = Color(0xFFF7F8FA),
@@ -118,8 +118,8 @@ data class ComposeDiffColorPalette(
             modifiedWordBg = Color(0xFFB4D2FC),
             modifiedBorder = Color(0xFF8AB4F8),
             activeFragmentBorder = Color(0xFF3574F0),
-            buttonBg = Color(0xFFFFFFFF),
-            buttonBorder = Color(0xFFC4C4C4),
+            buttonBg = Color(0xFFE6E8EC),
+            buttonBorder = Color(0xFFD3D5DB),
             accentBlue = Color(0xFF3574F0)
         )
     }
@@ -152,11 +152,11 @@ data class AppSpacing(
  */
 @Immutable
 data class AppShapes(
-    val subtle: RoundedCornerShape = RoundedCornerShape(4.dp),
-    val control: RoundedCornerShape = RoundedCornerShape(4.dp),
-    val tab: RoundedCornerShape = RoundedCornerShape(4.dp),
-    val modal: RoundedCornerShape = RoundedCornerShape(6.dp),
-    val dialog: RoundedCornerShape = RoundedCornerShape(6.dp)
+    val subtle: RoundedCornerShape = RoundedCornerShape(2.dp),
+    val control: RoundedCornerShape = RoundedCornerShape(2.dp),
+    val tab: RoundedCornerShape = RoundedCornerShape(0.dp),
+    val modal: RoundedCornerShape = RoundedCornerShape(4.dp),
+    val dialog: RoundedCornerShape = RoundedCornerShape(4.dp)
 )
 
 /**

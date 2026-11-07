@@ -45,6 +45,7 @@ import org.ijdiff.model.twoway.DiffViewMode
 import org.ijdiff.model.twoway.TwoWayDiffSession
 import org.ijdiff.ui.compose.components.AppButton
 import org.ijdiff.ui.compose.components.AppDialog
+import org.ijdiff.ui.compose.components.AppHorizontalDivider
 import org.ijdiff.ui.compose.components.AppSelect
 import org.ijdiff.ui.compose.components.AppText
 import org.ijdiff.ui.compose.components.ButtonVariant
@@ -222,19 +223,18 @@ fun ComposeMainScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(palette.toolbarBg)
-                        .border(0.5.dp, palette.gutterBorder)
-                        .padding(horizontal = AppTheme.spacing.toolbarHorizontalPadding, vertical = AppTheme.spacing.sm)
+                        .padding(horizontal = AppTheme.spacing.toolbarHorizontalPadding, vertical = AppTheme.spacing.xs)
                 ) {
                     AppButton(
                         text = "Compare Paths...",
                         onClick = { showCompareModal = true }
                     )
-                    Spacer(Modifier.width(AppTheme.spacing.sm))
+                    Spacer(Modifier.width(AppTheme.spacing.xs))
                     AppButton(
                         text = "+ Scratch Diff",
                         onClick = { controller.openBlankScratchDiff() }
                     )
-                    Spacer(Modifier.width(AppTheme.spacing.sm))
+                    Spacer(Modifier.width(AppTheme.spacing.xs))
                     AppButton(
                         text = "Load Sample Suite",
                         onClick = { controller.loadAllBuiltInSamples() }
@@ -262,19 +262,18 @@ fun ComposeMainScreen(
                         onSelected = { themeState.theme = it }
                     )
                 }
+                AppHorizontalDivider()
 
-                // Tab Bar
+                // Flat Tab Bar
                 if (controller.tabs.isNotEmpty()) {
                     val tabScroll = rememberScrollState()
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(32.dp)
+                            .height(AppTheme.spacing.tabBarHeight)
                             .background(palette.gutterBg)
-                            .border(0.5.dp, palette.gutterBorder)
                             .horizontalScroll(tabScroll)
-                            .padding(horizontal = AppTheme.spacing.sm)
                     ) {
                         for (tab in controller.tabs) {
                             val isSelected = tab.id == controller.activeTabId
@@ -285,56 +284,81 @@ fun ComposeMainScreen(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .height(AppTheme.spacing.toolbarHeight)
-                                    .padding(end = AppTheme.spacing.xs)
-                                    .clip(AppTheme.shapes.tab)
-                                    .background(tabBg)
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isSelected) palette.accentBlue else palette.buttonBorder,
-                                        shape = AppTheme.shapes.tab
-                                    )
-                                    .clickable { controller.activeTabId = tab.id }
-                                    .padding(horizontal = AppTheme.spacing.md)
+                                    .height(AppTheme.spacing.tabBarHeight)
                             ) {
-                                if (tab is ComposeDiffTab.DirectoryTab) {
-                                    ComposeVectorIcon(
-                                        kind = VectorIconKind.FOLDER,
-                                        tint = palette.modifiedBorder,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(Modifier.width(5.dp))
-                                }
-                                AppText(
-                                    text = label,
-                                    color = palette.editorFg,
-                                    fontFamily = themeState.uiFontFamily,
-                                    fontSize = (themeState.uiFontSizePt - 1).coerceAtLeast(10).sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1
-                                )
-                                Spacer(Modifier.width(AppTheme.spacing.sm))
                                 Box(
-                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier
-                                        .size(14.dp)
-                                        .clickable {
-                                            if (tab is ComposeDiffTab.FileTab && tab.session.hasUnsavedChanges()) {
-                                                pendingCloseTab = tab
-                                            } else {
-                                                controller.closeTab(tab.id)
-                                            }
-                                        }
+                                        .height(AppTheme.spacing.tabBarHeight)
+                                        .background(tabBg)
+                                        .clickable { controller.activeTabId = tab.id }
                                 ) {
-                                    ComposeVectorIcon(
-                                        kind = VectorIconKind.CLOSE_X,
-                                        tint = palette.gutterFg,
-                                        modifier = Modifier.size(10.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .height(AppTheme.spacing.tabBarHeight)
+                                            .padding(horizontal = AppTheme.spacing.lg)
+                                    ) {
+                                        if (tab is ComposeDiffTab.DirectoryTab) {
+                                            ComposeVectorIcon(
+                                                kind = VectorIconKind.FOLDER,
+                                                tint = palette.modifiedBorder,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Spacer(Modifier.width(5.dp))
+                                        }
+                                        AppText(
+                                            text = label,
+                                            color = if (isSelected) palette.editorFg else palette.gutterFg,
+                                            fontFamily = themeState.uiFontFamily,
+                                            fontSize = (themeState.uiFontSizePt - 1).coerceAtLeast(10).sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            maxLines = 1
+                                        )
+                                        Spacer(Modifier.width(AppTheme.spacing.md))
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clickable {
+                                                    if (tab is ComposeDiffTab.FileTab && tab.session.hasUnsavedChanges()) {
+                                                        pendingCloseTab = tab
+                                                    } else {
+                                                        controller.closeTab(tab.id)
+                                                    }
+                                                }
+                                        ) {
+                                            ComposeVectorIcon(
+                                                kind = VectorIconKind.CLOSE_X,
+                                                tint = palette.gutterFg,
+                                                modifier = Modifier.size(9.dp)
+                                            )
+                                        }
+                                    }
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(2.dp)
+                                                    .align(Alignment.BottomStart)
+                                                    .background(palette.accentBlue)
+                                            )
+                                        }
+                                    }
                                 }
+                                Box(
+                                    modifier = Modifier
+                                        .width(1.dp)
+                                        .height(AppTheme.spacing.tabBarHeight)
+                                        .background(palette.gutterBorder)
+                                )
                             }
                         }
                     }
+                    AppHorizontalDivider()
                 }
 
                 // Active Tab Content

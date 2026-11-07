@@ -74,6 +74,7 @@ import org.ijdiff.model.twoway.HighlightPolicy
 import org.ijdiff.model.twoway.TwoWayDiffSession
 import org.ijdiff.ui.compose.ComposeDiffPresentation
 import org.ijdiff.ui.compose.components.AppButton
+import org.ijdiff.ui.compose.components.AppHorizontalDivider
 import org.ijdiff.ui.compose.components.AppSelect
 import org.ijdiff.ui.compose.components.AppText
 import org.ijdiff.ui.compose.components.AppToolbarSeparator
@@ -345,18 +346,19 @@ fun ComposeTwoWayDiffView(
         }
 
         if (viewMode == DiffViewMode.UNIFIED) {
+            AppHorizontalDivider()
             ComposeUnifiedDiffPane(
                 unifiedResult = state.unifiedResult,
                 listState = unifiedListState,
                 lineHeightDp = lineHeightDp
             )
         } else {
+            AppHorizontalDivider()
             // File header strip
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(palette.appBg)
-                    .border(0.5.dp, palette.gutterBorder)
                     .padding(horizontal = AppTheme.spacing.lg, vertical = AppTheme.spacing.xs)
             ) {
                 val leftBadge = buildString {
@@ -391,6 +393,7 @@ fun ComposeTwoWayDiffView(
                     modifier = Modifier.weight(1f)
                 )
             }
+            AppHorizontalDivider()
 
             // 4-Column Side-by-Side Layout: Left Pane | Bezier Divider | Right Pane | Overview Bar
             Row(modifier = Modifier.fillMaxSize().clipToBounds()) {

@@ -4,7 +4,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -277,7 +279,7 @@ fun AppText(
 }
 
 /**
- * Variant-based button component supporting leading icons and custom slot content.
+ * Flat UI button component supporting leading icons, hover states, and custom slot content without 3D/boxed borders.
  */
 @Composable
 fun AppButton(
@@ -291,19 +293,17 @@ fun AppButton(
     val palette = AppTheme.colors
     val spacing = AppTheme.spacing
     val shape = AppTheme.shapes.subtle
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
     val isActive = (variant as? ButtonVariant.ToolbarToggle)?.active == true
     val isPrimary = variant is ButtonVariant.ToolbarPrimary
 
     val bgColor = when {
-        isActive -> palette.accentBlue.copy(alpha = 0.28f)
-        isPrimary && enabled -> palette.accentBlue.copy(alpha = if (palette.isDark) 0.24f else 0.16f)
-        enabled -> palette.buttonBg
-        else -> palette.toolbarBg
-    }
-    val borderColor = when {
-        isActive -> palette.accentBlue
-        isPrimary && enabled -> palette.accentBlue
-        else -> palette.buttonBorder
+        !enabled -> Color.Transparent
+        isPrimary -> if (isHovered) palette.accentBlue.copy(alpha = 0.88f) else palette.accentBlue
+        isActive -> palette.accentBlue.copy(alpha = if (palette.isDark) 0.28f else 0.18f)
+        isHovered -> palette.buttonBg
+        else -> Color.Transparent
     }
 
     Row(
@@ -313,11 +313,16 @@ fun AppButton(
             .height(spacing.controlHeight)
             .clip(shape)
             .background(bgColor)
-            .border(1.dp, borderColor, shape)
+            .hoverable(interactionSource = interactionSource, enabled = enabled)
             .let { mod ->
                 if (enabled) mod.pointerHoverIcon(PointerIcon.Hand) else mod
             }
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            )
             .padding(horizontal = spacing.md)
     ) {
         if (leadingIcon != null) {
@@ -329,7 +334,7 @@ fun AppButton(
 }
 
 /**
- * Data + variant convenience overload of [AppButton] for toolbar controls.
+ * Data + variant convenience overload of [AppButton] for flat toolbar controls.
  */
 @Composable
 fun AppButton(
@@ -342,8 +347,15 @@ fun AppButton(
 ) {
     val palette = AppTheme.colors
     val typography = AppTheme.typography
-    val fgColor = if (enabled) palette.editorFg else palette.gutterFg
-    val isBold = variant is ButtonVariant.ToolbarPrimary
+    val isActive = (variant as? ButtonVariant.ToolbarToggle)?.active == true
+    val isPrimary = variant is ButtonVariant.ToolbarPrimary
+    val fgColor = when {
+        !enabled -> palette.gutterFg.copy(alpha = 0.55f)
+        isPrimary -> Color.White
+        isActive -> if (palette.isDark) Color(0xFF88B4FF) else palette.accentBlue
+        else -> palette.editorFg
+    }
+    val isBold = isPrimary || isActive
 
     AppButton(
         onClick = onClick,
@@ -398,18 +410,31 @@ fun ToolbarActionButton(
 fun AppToolbarSeparator() {
     val palette = AppTheme.colors
     val spacing = AppTheme.spacing
-    Spacer(Modifier.width(spacing.sm))
+    Spacer(Modifier.width(spacing.xs))
     Box(
         modifier = Modifier
             .width(1.dp)
-            .height(18.dp)
+            .height(16.dp)
             .background(palette.gutterBorder)
     )
-    Spacer(Modifier.width(spacing.sm))
+    Spacer(Modifier.width(spacing.xs))
 }
 
 /**
- * Desktop-native Select/Dropdown built on `androidx.compose.ui.window.Popup` with zero Material dependencies.
+ * Flat 1dp horizontal hairline divider between UI sections.
+ */
+@Composable
+fun AppHorizontalDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(AppTheme.colors.gutterBorder)
+    )
+}
+
+/**
+ * Flat desktop-native Select/Dropdown built on `androidx.compose.ui.window.Popup` with zero Material dependencies.
  */
 @Composable
 fun <T> AppSelect(
@@ -424,8 +449,16 @@ fun <T> AppSelect(
     val shape = AppTheme.shapes.subtle
     val typography = AppTheme.typography
     var expanded by remember { mutableStateOf(false) }
+    val triggerInteraction = remember { MutableInteractionSource() }
+    val isHovered by triggerInteraction.collectIsHoveredAsState()
     val density = LocalDensity.current
     val popupOffsetPx = with(density) { IntOffset(0, (spacing.controlHeight + spacing.xxs).roundToPx()) }
+
+    val triggerBg = when {
+        expanded -> palette.accentBlue.copy(alpha = if (palette.isDark) 0.25f else 0.16f)
+        isHovered -> palette.buttonBg
+        else -> palette.editorBg.copy(alpha = if (palette.isDark) 0.45f else 0.70f)
+    }
 
     Box(modifier = modifier) {
         Row(
@@ -433,10 +466,14 @@ fun <T> AppSelect(
             modifier = Modifier
                 .height(spacing.controlHeight)
                 .clip(shape)
-                .background(palette.buttonBg)
-                .border(1.dp, if (expanded) palette.accentBlue else palette.buttonBorder, shape)
+                .background(triggerBg)
+                .hoverable(interactionSource = triggerInteraction)
                 .pointerHoverIcon(PointerIcon.Hand)
-                .clickable { expanded = !expanded }
+                .clickable(
+                    interactionSource = triggerInteraction,
+                    indication = null,
+                    onClick = { expanded = !expanded }
+                )
                 .padding(horizontal = spacing.md)
         ) {
             AppText(
@@ -464,24 +501,30 @@ fun <T> AppSelect(
                         .width(IntrinsicSize.Max)
                         .widthIn(min = 140.dp)
                         .clip(shape)
-                        .background(palette.toolbarBg)
-                        .border(1.dp, palette.buttonBorder, shape)
-                        .padding(vertical = spacing.xs)
+                        .background(palette.editorBg)
+                        .border(1.dp, palette.gutterBorder, shape)
+                        .padding(vertical = spacing.xxs)
                 ) {
                     for (option in options) {
                         val isCurrent = option == selected
-                        val itemBg = if (isCurrent) {
-                            palette.accentBlue.copy(alpha = if (palette.isDark) 0.32f else 0.20f)
-                        } else {
-                            Color.Transparent
+                        val itemInteraction = remember { MutableInteractionSource() }
+                        val itemHovered by itemInteraction.collectIsHoveredAsState()
+                        val itemBg = when {
+                            isCurrent -> palette.accentBlue.copy(alpha = if (palette.isDark) 0.30f else 0.18f)
+                            itemHovered -> palette.buttonBg
+                            else -> Color.Transparent
                         }
                         Box(
                             contentAlignment = Alignment.CenterStart,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(itemBg)
+                                .hoverable(interactionSource = itemInteraction)
                                 .pointerHoverIcon(PointerIcon.Hand)
-                                .clickable {
+                                .clickable(
+                                    interactionSource = itemInteraction,
+                                    indication = null
+                                ) {
                                     expanded = false
                                     onSelected(option)
                                 }
@@ -514,7 +557,7 @@ fun <T> ToolbarDropdownSelector(
 )
 
 /**
- * Standardized desktop modal dialog overlay (`AppDialog`) with header title, body slot, and footer action bar.
+ * Standardized flat desktop modal dialog overlay (`AppDialog`) with header title, body slot, and footer action bar.
  */
 @Composable
 fun AppDialog(
@@ -546,18 +589,19 @@ fun AppDialog(
             modifier = Modifier
                 .width(width)
                 .clip(shapes.modal)
-                .background(palette.toolbarBg)
-                .border(1.dp, palette.buttonBorder, shapes.modal)
+                .background(palette.appBg)
+                .border(1.dp, palette.gutterBorder, shapes.modal)
                 .clickable(
                     interactionSource = surfaceInteraction,
                     indication = null,
                     onClick = {}
                 )
-                .padding(spacing.xxl)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.xxl, vertical = spacing.lg)
             ) {
                 AppText(
                     text = title,
@@ -567,7 +611,7 @@ fun AppDialog(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(18.dp)
+                        .size(20.dp)
                         .pointerHoverIcon(PointerIcon.Hand)
                         .clickable(onClick = onDismissRequest)
                 ) {
@@ -578,13 +622,20 @@ fun AppDialog(
                     )
                 }
             }
-            Spacer(Modifier.height(spacing.lg + 2.dp))
-            content()
-            Spacer(Modifier.height(spacing.xl))
+            AppHorizontalDivider()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.xxl, vertical = spacing.xl),
+                content = content
+            )
+            AppHorizontalDivider()
             Row(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.xxl, vertical = spacing.lg),
                 content = actions
             )
         }

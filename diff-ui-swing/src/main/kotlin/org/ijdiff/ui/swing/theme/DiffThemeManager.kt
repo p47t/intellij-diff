@@ -244,6 +244,10 @@ object DiffThemeManager {
                 FlatIntelliJLaf.setup()
             }
             UIManager.put("defaultFont", resource)
+            UIManager.put("Button.arc", 2)
+            UIManager.put("Component.arc", 2)
+            UIManager.put("TextComponent.arc", 2)
+            UIManager.put("TabbedPane.showTabSeparators", true)
         }
     }
 }

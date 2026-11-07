@@ -40,6 +40,7 @@ import org.ijdiff.model.dirdiff.DirDiffSession
 import org.ijdiff.model.dirdiff.DirDiffStatus
 import org.ijdiff.model.dirdiff.DirSyncAction
 import org.ijdiff.ui.compose.components.AppButton
+import org.ijdiff.ui.compose.components.AppHorizontalDivider
 import org.ijdiff.ui.compose.components.AppSelect
 import org.ijdiff.ui.compose.components.AppText
 import org.ijdiff.ui.compose.components.AppToolbarSeparator
@@ -227,6 +228,7 @@ fun ComposeDirDiffView(
                 fontWeight = FontWeight.Bold
             )
         }
+        AppHorizontalDivider()
 
         // Master table + detail preview share the space below the toolbar
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -237,7 +239,7 @@ fun ComposeDirDiffView(
                 val masterHeightDp = DirDiffLayout.computeMasterPaneHeight(
                     itemCount = filteredEntries.size,
                     rowHeight = rowHeightDp.value,
-                    // Header row plus top/bottom borders
+                    // Header row plus bottom divider
                     headerHeight = rowHeightDp.value + 1f,
                     availableHeight = availableHeightDp.value
                 ).dp
@@ -247,7 +249,6 @@ fun ComposeDirDiffView(
                         .fillMaxWidth()
                         .height(masterHeightDp)
                         .background(palette.editorBg)
-                        .border(0.5.dp, palette.gutterBorder)
                 ) {
                     // Table Header
                     Row(
@@ -256,7 +257,6 @@ fun ComposeDirDiffView(
                             .fillMaxWidth()
                             .height(rowHeightDp)
                             .background(palette.gutterBg)
-                            .border(0.5.dp, palette.gutterBorder)
                             .padding(horizontal = 8.dp)
                     ) {
                         AppText(
@@ -303,6 +303,7 @@ fun ComposeDirDiffView(
                             modifier = Modifier.width(90.dp)
                         )
                     }
+                    AppHorizontalDivider()
 
                     // Table Rows
                     LazyColumn(
@@ -380,6 +381,7 @@ fun ComposeDirDiffView(
                         }
                     }
                 }
+                AppHorizontalDivider()
 
                 // Detail Embedded 2-Way Diff Preview (takes all remaining height)
                 Box(
