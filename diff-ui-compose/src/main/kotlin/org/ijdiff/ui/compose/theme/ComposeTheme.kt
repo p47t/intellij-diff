@@ -142,7 +142,11 @@ data class AppSpacing(
     val toolbarHorizontalPadding: Dp = 10.dp,
     val toolbarVerticalPadding: Dp = 5.dp,
     val tabBarHeight: Dp = 32.dp,
+    val iconSize: Dp = 14.dp,
+    val smallIconSize: Dp = 11.dp,
     val gutterActionWidth: Dp = 22.dp,
+    val gutterIconWidth: Dp = 15.dp,
+    val gutterIconHeight: Dp = 13.dp,
     val dividerWidth: Dp = 38.dp,
     val overviewBarWidth: Dp = 14.dp
 )
@@ -188,7 +192,20 @@ class ComposeThemeState(
     var uiFontFamilyName by mutableStateOf(initialConfig.uiFontFamily ?: "Inter")
     var uiFontSizePt by mutableStateOf(initialConfig.uiFontSize)
 
-    val spacing: AppSpacing = AppSpacing()
+    val spacing: AppSpacing
+        get() {
+            val ctrlH = (uiFontSizePt + 13).coerceAtLeast(26).dp
+            return AppSpacing(
+                controlHeight = ctrlH,
+                toolbarHeight = ctrlH,
+                tabBarHeight = (uiFontSizePt + 19).coerceAtLeast(32).dp,
+                iconSize = (uiFontSizePt + 1).coerceAtLeast(13).dp,
+                smallIconSize = (uiFontSizePt - 2).coerceAtLeast(10).dp,
+                gutterActionWidth = (editorFontSizePt + 9).coerceAtLeast(22).dp,
+                gutterIconWidth = (editorFontSizePt + 2).coerceAtLeast(15).dp,
+                gutterIconHeight = editorFontSizePt.coerceAtLeast(13).dp
+            )
+        }
     val shapes: AppShapes = AppShapes()
 
     val palette: ComposeDiffColorPalette
@@ -199,6 +216,9 @@ class ComposeThemeState(
 
     val uiFontFamily: FontFamily
         get() = resolveFontFamily(uiFontFamilyName, fallback = FontFamily.SansSerif)
+
+    val nerdFontFamily: FontFamily
+        get() = resolveNerdFontFamily(editorFontFamilyName, fallback = editorFontFamily)
 
     val typography: AppTypography
         get() {
@@ -238,6 +258,38 @@ class ComposeThemeState(
 
     companion object {
         private val fontCache = mutableMapOf<String, FontFamily>()
+        private val nerdFontCache = mutableMapOf<String, FontFamily>()
+
+        /**
+         * Preferred full-size (Propo / non-Mono) Nerd Font families where PUA icons are rendered
+         * at full cap-height instead of shrunk into a narrow 1-cell monospace box.
+         */
+        private val PREFERRED_NERD_FONT_FAMILIES = listOf(
+            "Symbols Nerd Font",
+            "CaskaydiaMono Nerd Font Propo",
+            "CaskaydiaCode Nerd Font Propo",
+            "JetBrainsMono Nerd Font Propo",
+            "FiraCode Nerd Font Propo",
+            "Iosevka Nerd Font Propo",
+            "MesloLGS Nerd Font Propo",
+            "Hack Nerd Font Propo",
+            "JetBrainsMono Nerd Font",
+            "CaskaydiaMono Nerd Font",
+            "CaskaydiaCode Nerd Font",
+            "FiraCode Nerd Font",
+            "MesloLGS NF",
+            "Hack Nerd Font",
+            "Symbols Nerd Font Mono"
+        )
+
+        private fun hasNerdFontGlyphs(tf: Typeface): Boolean {
+            return tf.getUTF32Glyph(0xF015) != 0.toShort() || tf.getUTF32Glyph(0xE711) != 0.toShort()
+        }
+
+        private fun isShrunkMonoNerdFontName(name: String): Boolean {
+            val lower = name.lowercase()
+            return lower.endsWith("mono") || lower.endsWith("nfm") || lower.contains("monaspace")
+        }
 
         fun resolveFontFamily(familyName: String, fallback: FontFamily): FontFamily {
             val trimmed = familyName.trim()
@@ -247,6 +299,62 @@ class ComposeThemeState(
                     val skiaTypeface: Typeface? = FontMgr.default.matchFamilyStyle(trimmed, FontStyle.NORMAL)
                     if (skiaTypeface != null) {
                         FontFamily(ComposeTypeface(skiaTypeface))
+                    } else {
+                        fallback
+                    }
+                }.getOrDefault(fallback)
+            }
+        }
+
+        /**
+         * Resolves a full-size Nerd Font [FontFamily] for rendering Private Use Area (PUA) icons,
+         * avoiding `Nerd Font Mono` / `Monaspace NF` fallback faces that shrink icons to ~50% height.
+         */
+        fun resolveNerdFontFamily(primaryFamilyName: String, fallback: FontFamily): FontFamily {
+            val key = primaryFamilyName.trim()
+            return nerdFontCache.getOrPut(key) {
+                runCatching {
+                    val fontMgr = FontMgr.default
+                    // 1. If the user's primary font itself has full-size (non-Mono) Nerd Font glyphs, use it
+                    if (key.isNotEmpty() && !isShrunkMonoNerdFontName(key)) {
+                        val primaryTf = fontMgr.matchFamilyStyle(key, FontStyle.NORMAL)
+                        if (primaryTf != null && hasNerdFontGlyphs(primaryTf)) {
+                            return@getOrPut FontFamily(ComposeTypeface(primaryTf))
+                        }
+                    }
+
+                    // 2. Check preferred full-size / Propo Nerd Font families
+                    for (candidate in PREFERRED_NERD_FONT_FAMILIES) {
+                        val tf = fontMgr.matchFamilyStyle(candidate, FontStyle.NORMAL)
+                        if (tf != null && hasNerdFontGlyphs(tf)) {
+                            return@getOrPut FontFamily(ComposeTypeface(tf))
+                        }
+                    }
+
+                    // 3. Scan installed families for any Propo or non-Mono Nerd Font
+                    val count = fontMgr.familiesCount
+                    var fallbackNerdTf: Typeface? = null
+                    for (i in 0 until count) {
+                        val fam = fontMgr.getFamilyName(i)
+                        val lower = fam.lowercase()
+                        if (!lower.contains("nerd") && !lower.contains(" nf")) continue
+                        val tf = fontMgr.matchFamilyStyle(fam, FontStyle.NORMAL) ?: continue
+                        if (!hasNerdFontGlyphs(tf)) continue
+                        if (lower.contains("propo") || lower.contains("nfp")) {
+                            return@getOrPut FontFamily(ComposeTypeface(tf))
+                        }
+                        if (!isShrunkMonoNerdFontName(fam) && fallbackNerdTf == null) {
+                            fallbackNerdTf = tf
+                        }
+                    }
+                    if (fallbackNerdTf != null) {
+                        return@getOrPut FontFamily(ComposeTypeface(fallbackNerdTf))
+                    }
+
+                    // 4. Final fallback via character matching
+                    val charMatched = fontMgr.matchFamilyStyleCharacter(key, FontStyle.NORMAL, null, 0xF015)
+                    if (charMatched != null) {
+                        FontFamily(ComposeTypeface(charMatched))
                     } else {
                         fallback
                     }

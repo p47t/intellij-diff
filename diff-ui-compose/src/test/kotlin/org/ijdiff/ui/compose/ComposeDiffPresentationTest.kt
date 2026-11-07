@@ -17,6 +17,7 @@ import org.ijdiff.ui.compose.components.ButtonVariant
 import org.ijdiff.ui.compose.dirdiff.ComposeDirDiffView
 import org.ijdiff.ui.compose.shell.ComposeMainScreen
 import org.ijdiff.ui.compose.shell.ComposeShellController
+import org.ijdiff.ui.compose.syntax.ComposeSyntaxHighlighter
 import org.ijdiff.ui.compose.theme.AppTheme
 import org.ijdiff.ui.compose.theme.ComposeAppTheme
 import org.ijdiff.ui.compose.theme.ComposeThemeState
@@ -208,5 +209,70 @@ class ComposeDiffPresentationTest {
             assertEquals(1000, img.width)
             assertEquals(600, img.height)
         }
+    }
+
+    @Test
+    fun `ComposeSyntaxHighlighter scales Nerd Font PUA glyphs and renders 18pt config cleanly`() {
+        val outDir = Path.of("build/reports/compose-renders")
+        Files.createDirectories(outDir)
+
+        val themeState = ComposeThemeState(
+            initialTheme = ComposeAppTheme.DARK,
+            initialConfig = IjDiffConfig(
+                fontFamily = "Ioskeley Mono NL",
+                fontSize = 18,
+                uiFontFamily = "Noto Sans",
+                uiFontSize = 18
+            )
+        )
+        val lineWithNerdIcons = "val icons = \"\uE711  \uF015  \uF07B  \uDB80\uDE19  status-bar\""
+        assertTrue(ComposeSyntaxHighlighter.containsNerdFontGlyphs(lineWithNerdIcons))
+
+        val highlighted = ComposeSyntaxHighlighter.highlightLine(
+            lineText = lineWithNerdIcons,
+            palette = themeState.palette,
+            nerdFontFamily = themeState.nerdFontFamily,
+            baseFontSizeSp = 18f
+        )
+        val expectedScaledSp = 18f * ComposeSyntaxHighlighter.NERD_FONT_SCALE_FACTOR
+        val scaledSpans = highlighted.spanStyles.filter {
+            kotlin.math.abs(it.item.fontSize.value - expectedScaledSp) < 0.05f
+        }
+        assertEquals(4, scaledSpans.size)
+
+        val leftText = listOf(
+            "// Waybar / Omarchy Status Icons",
+            "\"format-icons\": {",
+            "    \"default\": \"\uF015  Home\",",
+            "    \"folder\": \"\uF07B  Projects\",",
+            "    \"git\": \"\uE711  Branch\"",
+            "}"
+        ).joinToString("\n")
+        val rightText = listOf(
+            "// Waybar / Omarchy Status Icons (Updated)",
+            "\"format-icons\": {",
+            "    \"default\": \"\uF015  Workspace\",",
+            "    \"folder\": \"\uF07B  Repositories\",",
+            "    \"git\": \"\uE711  Main\",",
+            "    \"file\": \"\uDB80\uDE19  Config\"",
+            "}"
+        ).joinToString("\n")
+        val session = TwoWayDiffSession(
+            DiffDocument(initialText = leftText, title = "waybar-left.json"),
+            DiffDocument(initialText = rightText, title = "waybar-right.json")
+        )
+
+        ImageComposeScene(width = 1280, height = 560).use { scene ->
+            scene.setContent {
+                ProvideComposeDiffTheme(themeState) {
+                    ComposeTwoWayDiffView(session = session)
+                }
+            }
+            val img = scene.render()
+            val pngData = img.encodeToData(EncodedImageFormat.PNG)
+            assertNotNull(pngData)
+            Files.write(outDir.resolve("compose-nerd-font-18pt.png"), pngData!!.bytes)
+        }
+        assertTrue(Files.exists(outDir.resolve("compose-nerd-font-18pt.png")))
     }
 }

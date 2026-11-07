@@ -244,7 +244,8 @@ class DiffEditorPane(
      */
     private inner class DiffGutterComponent : JComponent() {
         private var hoveredFragmentIndex: Int = -1
-        private val actionColumnWidth = 22
+        private val actionColumnWidth: Int
+            get() = (DiffThemeManager.fontSpec.value.size + 9).coerceAtLeast(22)
 
         init {
             val mouseHandler = object : MouseAdapter() {

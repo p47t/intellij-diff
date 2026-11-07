@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import org.ijdiff.ui.compose.syntax.ComposeSyntaxHighlighter
 import org.ijdiff.ui.compose.theme.AppTheme
 
 enum class VectorIconKind {
@@ -81,83 +82,103 @@ sealed interface ButtonVariant {
 fun ComposeVectorIcon(
     kind: VectorIconKind,
     tint: Color = AppTheme.colors.editorFg,
-    modifier: Modifier = Modifier.size(12.dp)
+    modifier: Modifier = Modifier.size(AppTheme.spacing.iconSize)
 ) {
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val minDim = minOf(w, h)
+        val strokeWidth = (minDim * 0.13f).coerceAtLeast(1.5f)
+        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         when (kind) {
             VectorIconKind.ARROW_UP -> {
-                val cx = w / 2f
+                val cx = w * 0.5f
+                val top = h * 0.15f
+                val bottom = h * 0.85f
+                val wingX = w * 0.30f
+                val wingY = h * 0.45f
                 val path = Path().apply {
-                    moveTo(cx, h - 2f)
-                    lineTo(cx, 2f)
-                    moveTo(cx - 3.5f, 5.5f)
-                    lineTo(cx, 2f)
-                    lineTo(cx + 3.5f, 5.5f)
+                    moveTo(cx, bottom)
+                    lineTo(cx, top)
+                    moveTo(cx - wingX, wingY)
+                    lineTo(cx, top)
+                    lineTo(cx + wingX, wingY)
                 }
                 drawPath(path, color = tint, style = stroke)
             }
             VectorIconKind.ARROW_DOWN -> {
-                val cx = w / 2f
+                val cx = w * 0.5f
+                val top = h * 0.15f
+                val bottom = h * 0.85f
+                val wingX = w * 0.30f
+                val wingY = h * 0.55f
                 val path = Path().apply {
-                    moveTo(cx, 2f)
-                    lineTo(cx, h - 2f)
-                    moveTo(cx - 3.5f, h - 5.5f)
-                    lineTo(cx, h - 2f)
-                    lineTo(cx + 3.5f, h - 5.5f)
+                    moveTo(cx, top)
+                    lineTo(cx, bottom)
+                    moveTo(cx - wingX, wingY)
+                    lineTo(cx, bottom)
+                    lineTo(cx + wingX, wingY)
                 }
                 drawPath(path, color = tint, style = stroke)
             }
             VectorIconKind.UNDO -> {
+                val pad = minDim * 0.16f
                 drawArc(
                     color = tint,
                     startAngle = 180f,
                     sweepAngle = 230f,
                     useCenter = false,
-                    topLeft = Offset(2f, 3f),
-                    size = Size(w - 4f, h - 4f),
+                    topLeft = Offset(pad, pad * 1.25f),
+                    size = Size(w - pad * 2f, h - pad * 2f),
                     style = stroke
                 )
+                val headSize = minDim * 0.32f
+                val headTop = pad * 1.35f
                 val head = Path().apply {
-                    moveTo(2f, 4f)
-                    lineTo(2f, 8f)
-                    lineTo(6f, 8f)
+                    moveTo(pad, headTop)
+                    lineTo(pad, headTop + headSize)
+                    lineTo(pad + headSize, headTop + headSize)
                 }
                 drawPath(head, color = tint, style = stroke)
             }
             VectorIconKind.REFRESH -> {
+                val pad = minDim * 0.16f
                 drawArc(
                     color = tint,
                     startAngle = -45f,
                     sweepAngle = -270f,
                     useCenter = false,
-                    topLeft = Offset(2f, 2f),
-                    size = Size(w - 4f, h - 4f),
+                    topLeft = Offset(pad, pad),
+                    size = Size(w - pad * 2f, h - pad * 2f),
                     style = stroke
                 )
+                val headSize = minDim * 0.32f
+                val rx = w - pad * 1.2f
                 val head = Path().apply {
-                    moveTo(w - 2.5f, 2f)
-                    lineTo(w - 2.5f, 6f)
-                    lineTo(w - 6.5f, 6f)
+                    moveTo(rx, pad)
+                    lineTo(rx, pad + headSize)
+                    lineTo(rx - headSize, pad + headSize)
                 }
                 drawPath(head, color = tint, style = stroke)
             }
             VectorIconKind.FOLDER -> {
+                val padX = w * 0.10f
+                val topTabY = h * 0.20f
+                val bodyTopY = h * 0.34f
+                val bottomY = h * 0.84f
                 val path = Path().apply {
-                    moveTo(1.5f, 3f)
-                    lineTo(w * 0.42f, 3f)
-                    lineTo(w * 0.54f, 4.8f)
-                    lineTo(w - 1.5f, 4.8f)
-                    lineTo(w - 1.5f, h - 2f)
-                    lineTo(1.5f, h - 2f)
+                    moveTo(padX, topTabY)
+                    lineTo(w * 0.42f, topTabY)
+                    lineTo(w * 0.54f, bodyTopY)
+                    lineTo(w - padX, bodyTopY)
+                    lineTo(w - padX, bottomY)
+                    lineTo(padX, bottomY)
                     close()
                 }
                 drawPath(path, color = tint, style = stroke)
             }
             VectorIconKind.CLOSE_X -> {
-                val pad = 2.2f
+                val pad = minDim * 0.20f
                 val path = Path().apply {
                     moveTo(pad, pad)
                     lineTo(w - pad, h - pad)
@@ -167,11 +188,11 @@ fun ComposeVectorIcon(
                 drawPath(path, color = tint, style = stroke)
             }
             VectorIconKind.CHEVRON_RIGHT -> {
-                val cy = h / 2f
-                val cx = w / 2f
-                val dy = 3.2f
-                val dx = 2.5f
-                val gap = 2.0f
+                val cy = h * 0.5f
+                val cx = w * 0.5f
+                val dy = h * 0.30f
+                val dx = w * 0.20f
+                val gap = w * 0.15f
                 val path = Path().apply {
                     moveTo(cx - gap - dx, cy - dy)
                     lineTo(cx - gap, cy)
@@ -183,11 +204,11 @@ fun ComposeVectorIcon(
                 drawPath(path, color = tint, style = stroke)
             }
             VectorIconKind.CHEVRON_LEFT -> {
-                val cy = h / 2f
-                val cx = w / 2f
-                val dy = 3.2f
-                val dx = 2.5f
-                val gap = 2.0f
+                val cy = h * 0.5f
+                val cx = w * 0.5f
+                val dy = h * 0.30f
+                val dx = w * 0.20f
+                val gap = w * 0.15f
                 val path = Path().apply {
                     moveTo(cx - gap + dx, cy - dy)
                     lineTo(cx - gap, cy)
@@ -199,12 +220,14 @@ fun ComposeVectorIcon(
                 drawPath(path, color = tint, style = stroke)
             }
             VectorIconKind.CARET_DOWN -> {
-                val cx = w / 2f
-                val cy = h / 2f
+                val cx = w * 0.5f
+                val cy = h * 0.5f
+                val dx = w * 0.32f
+                val dy = h * 0.18f
                 val path = Path().apply {
-                    moveTo(cx - 3.2f, cy - 1.5f)
-                    lineTo(cx, cy + 2.0f)
-                    lineTo(cx + 3.2f, cy - 1.5f)
+                    moveTo(cx - dx, cy - dy)
+                    lineTo(cx, cy + dy)
+                    lineTo(cx + dx, cy - dy)
                 }
                 drawPath(path, color = tint, style = stroke)
             }
@@ -214,6 +237,7 @@ fun ComposeVectorIcon(
 
 /**
  * Pure CMP foundation text primitive with zero `androidx.compose.material` dependencies.
+ * Automatically scales Nerd Font Private Use Area (PUA) icons with a full-size Nerd Font family.
  */
 @Composable
 fun AppText(
@@ -239,14 +263,39 @@ fun AppText(
             textAlign = textAlign
         )
     )
-    BasicText(
-        text = text,
-        modifier = modifier,
-        style = mergedStyle,
-        softWrap = softWrap,
-        maxLines = maxLines,
-        overflow = if (maxLines == 1) TextOverflow.Ellipsis else TextOverflow.Clip
-    )
+    val overflow = if (maxLines == 1) TextOverflow.Ellipsis else TextOverflow.Clip
+    if (ComposeSyntaxHighlighter.containsNerdFontGlyphs(text)) {
+        val themeState = AppTheme.state
+        val baseSp = if (mergedStyle.fontSize != TextUnit.Unspecified) {
+            mergedStyle.fontSize.value
+        } else {
+            themeState.uiFontSizePt.toFloat()
+        }
+        val annotated = remember(text, themeState.nerdFontFamily, baseSp) {
+            ComposeSyntaxHighlighter.applyNerdFontSpans(
+                text = text,
+                nerdFontFamily = themeState.nerdFontFamily,
+                baseFontSizeSp = baseSp
+            )
+        }
+        BasicText(
+            text = annotated,
+            modifier = modifier,
+            style = mergedStyle,
+            softWrap = softWrap,
+            maxLines = maxLines,
+            overflow = overflow
+        )
+    } else {
+        BasicText(
+            text = text,
+            modifier = modifier,
+            style = mergedStyle,
+            softWrap = softWrap,
+            maxLines = maxLines,
+            overflow = overflow
+        )
+    }
 }
 
 @Composable
@@ -357,17 +406,18 @@ fun AppButton(
     }
     val isBold = isPrimary || isActive
 
+    val iconSize = AppTheme.spacing.iconSize
     AppButton(
         onClick = onClick,
         modifier = modifier,
         variant = variant,
         enabled = enabled,
         leadingIcon = if (icon != null && text.isNotEmpty()) {
-            { ComposeVectorIcon(kind = icon, tint = fgColor, modifier = Modifier.size(12.dp)) }
+            { ComposeVectorIcon(kind = icon, tint = fgColor, modifier = Modifier.size(iconSize)) }
         } else null
     ) {
         if (icon != null && text.isEmpty()) {
-            ComposeVectorIcon(kind = icon, tint = fgColor, modifier = Modifier.size(12.dp))
+            ComposeVectorIcon(kind = icon, tint = fgColor, modifier = Modifier.size(iconSize))
         }
         if (text.isNotEmpty()) {
             AppText(
@@ -485,7 +535,7 @@ fun <T> AppSelect(
             ComposeVectorIcon(
                 kind = VectorIconKind.CARET_DOWN,
                 tint = palette.gutterFg,
-                modifier = Modifier.size(10.dp)
+                modifier = Modifier.size(spacing.smallIconSize)
             )
         }
 
@@ -611,14 +661,14 @@ fun AppDialog(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(spacing.iconSize + 8.dp)
                         .pointerHoverIcon(PointerIcon.Hand)
                         .clickable(onClick = onDismissRequest)
                 ) {
                     ComposeVectorIcon(
                         kind = VectorIconKind.CLOSE_X,
                         tint = palette.gutterFg,
-                        modifier = Modifier.size(11.dp)
+                        modifier = Modifier.size(spacing.smallIconSize)
                     )
                 }
             }

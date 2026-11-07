@@ -116,7 +116,7 @@ fun ComposeTwoWayDiffView(
     val unifiedListState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    val lineHeightDp: Dp = (theme.editorFontSizePt + 7).dp
+    val lineHeightDp: Dp = (theme.editorFontSizePt + 8).dp
     val density = LocalDensity.current
     val lineHeightInt = with(density) { lineHeightDp.roundToPx().coerceAtLeast(16) }
     val lineHeightPx = lineHeightInt.toFloat()
@@ -585,8 +585,10 @@ private fun ComposeDiffSidePane(
             )
         } else {
             val gutterDigits = max(3, lines.size.toString().length)
-            val gutterNumWidth = (gutterDigits * 9 + 14).dp
-            val actionColWidth = 22.dp
+            val gutterNumWidth = (gutterDigits * (theme.editorFontSizePt * 0.68f).roundToInt() + 14).dp
+            val actionColWidth = AppTheme.spacing.gutterActionWidth
+            val chevronWidth = AppTheme.spacing.gutterIconWidth
+            val chevronHeight = AppTheme.spacing.gutterIconHeight
 
             LazyColumn(
                 state = listState,
@@ -629,7 +631,7 @@ private fun ComposeDiffSidePane(
                                         ComposeVectorIcon(
                                             kind = VectorIconKind.CHEVRON_LEFT,
                                             tint = palette.getBorderColor(info.diffType),
-                                            modifier = Modifier.width(14.dp).height(12.dp)
+                                            modifier = Modifier.width(chevronWidth).height(chevronHeight)
                                         )
                                     }
                                 }
@@ -663,7 +665,7 @@ private fun ComposeDiffSidePane(
                                         ComposeVectorIcon(
                                             kind = VectorIconKind.CHEVRON_RIGHT,
                                             tint = palette.getBorderColor(info.diffType),
-                                            modifier = Modifier.width(14.dp).height(12.dp)
+                                            modifier = Modifier.width(chevronWidth).height(chevronHeight)
                                         )
                                     }
                                 }
@@ -687,11 +689,15 @@ private fun ComposeDiffSidePane(
                                 .horizontalScroll(horizontalScroll)
                                 .padding(horizontal = 8.dp)
                         ) {
-                            val annotated = remember(lineStr, palette, info?.inlineRanges) {
+                            val nerdFam = theme.nerdFontFamily
+                            val edSizePt = theme.editorFontSizePt
+                            val annotated = remember(lineStr, palette, info?.inlineRanges, nerdFam, edSizePt) {
                                 ComposeSyntaxHighlighter.highlightLine(
                                     lineText = lineStr.replace("\t", "    "),
                                     palette = palette,
-                                    inlineRanges = info?.inlineRanges ?: emptyList()
+                                    inlineRanges = info?.inlineRanges ?: emptyList(),
+                                    nerdFontFamily = nerdFam,
+                                    baseFontSizeSp = edSizePt.toFloat()
                                 )
                             }
                             AppText(
@@ -962,7 +968,7 @@ private fun ComposeUnifiedDiffPane(
     val palette = theme.palette
     val lines = remember(unifiedResult.text) { unifiedResult.text.split('\n') }
     val horizontalScroll = rememberScrollState()
-    val colWidth = 42.dp
+    val colWidth = (theme.editorFontSizePt * 3 + 4).coerceAtLeast(42).dp
 
     LazyColumn(
         state = listState,
@@ -1030,10 +1036,14 @@ private fun ComposeUnifiedDiffPane(
                         .horizontalScroll(horizontalScroll)
                         .padding(horizontal = 8.dp)
                 ) {
-                    val annotated = remember(lineStr, palette) {
+                    val nerdFam = theme.nerdFontFamily
+                    val edSizePt = theme.editorFontSizePt
+                    val annotated = remember(lineStr, palette, nerdFam, edSizePt) {
                         ComposeSyntaxHighlighter.highlightLine(
                             lineText = lineStr.replace("\t", "    "),
-                            palette = palette
+                            palette = palette,
+                            nerdFontFamily = nerdFam,
+                            baseFontSizeSp = edSizePt.toFloat()
                         )
                     }
                     AppText(

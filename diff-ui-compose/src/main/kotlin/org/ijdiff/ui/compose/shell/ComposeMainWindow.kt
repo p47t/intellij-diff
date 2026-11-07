@@ -302,7 +302,7 @@ fun ComposeMainScreen(
                                             ComposeVectorIcon(
                                                 kind = VectorIconKind.FOLDER,
                                                 tint = palette.modifiedBorder,
-                                                modifier = Modifier.size(13.dp)
+                                                modifier = Modifier.size(AppTheme.spacing.iconSize)
                                             )
                                             Spacer(Modifier.width(5.dp))
                                         }
@@ -318,7 +318,7 @@ fun ComposeMainScreen(
                                         Box(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
-                                                .size(14.dp)
+                                                .size(AppTheme.spacing.smallIconSize + 5.dp)
                                                 .clickable {
                                                     if (tab is ComposeDiffTab.FileTab && tab.session.hasUnsavedChanges()) {
                                                         pendingCloseTab = tab
@@ -330,7 +330,7 @@ fun ComposeMainScreen(
                                             ComposeVectorIcon(
                                                 kind = VectorIconKind.CLOSE_X,
                                                 tint = palette.gutterFg,
-                                                modifier = Modifier.size(9.dp)
+                                                modifier = Modifier.size(AppTheme.spacing.smallIconSize)
                                             )
                                         }
                                     }
