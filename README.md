@@ -8,7 +8,8 @@
   - Authentic IntelliJ diff engine (`Myers` + `PatienceIntLCS` + `ByLine` + `ByWord` + `ByChar`).
   - Multi-tier highlighting: full-width line block backgrounds + deeper-tinted inline word/character changes.
   - Smooth cubic **Bezier curve splitter** (`DiffDividerGeometry` / `DiffDividerDrawUtil`) connecting corresponding line blocks across scroll positions.
-  - Synchronized scrolling powered by `LineNumberConvertor`.
+  - Synchronized vertical scrolling powered by `LineNumberConvertor` and horizontal scrolling in both frontends.
+  - Horizontal scrollbars for long lines in Side-by-Side and Unified views, with Shift+wheel and horizontal touchpad scrolling.
   - Interactive gutter chunk buttons (`»` / `«`) to replace or append (`Ctrl+Click`) changes between files.
   - Full freehand editing with Undo/Redo and **Explicit Save (`Ctrl+S`)** with unsaved-change protection.
 - **2-Way Unified (Single-Pane) Text Diff**:

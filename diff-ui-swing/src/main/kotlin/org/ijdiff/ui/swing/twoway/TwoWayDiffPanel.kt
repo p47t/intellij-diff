@@ -50,7 +50,9 @@ class TwoWayDiffPanel(
 
     private var syncingScroll = false
     private var lastLeftScrollY = -1
+    private var lastLeftScrollX = -1
     private var lastRightScrollY = -1
+    private var lastRightScrollX = -1
 
     val leftEditorPane = DiffEditorPane(
         side = EditorSide.LEFT,
@@ -382,8 +384,12 @@ class TwoWayDiffPanel(
         leftEditorPane.scrollPane.viewport.addChangeListener {
             dividerComponent.repaint()
             val leftPos = leftEditorPane.scrollPane.viewport.viewPosition
-            if (syncingScroll || leftPos.y == lastLeftScrollY) return@addChangeListener
+            if (syncingScroll) return@addChangeListener
+            val changedX = leftPos.x != lastLeftScrollX
+            val changedY = leftPos.y != lastLeftScrollY
+            lastLeftScrollX = leftPos.x
             lastLeftScrollY = leftPos.y
+            if (!changedX && !changedY) return@addChangeListener
             syncingScroll = true
             try {
                 val lineHeight = leftEditorPane.textArea.lineHeight.coerceAtLeast(16)
@@ -393,9 +399,12 @@ class TwoWayDiffPanel(
                 ).roundToInt().coerceAtLeast(0)
                 val rightViewport = rightEditorPane.scrollPane.viewport
                 val maxRightY = (rightEditorPane.textArea.height - rightViewport.extentSize.height).coerceAtLeast(0)
-                val clampedRightY = targetY.coerceAtMost(maxRightY)
+                val clampedRightY = if (changedY) targetY.coerceAtMost(maxRightY) else rightViewport.viewPosition.y
+                val maxRightX = (rightEditorPane.textArea.width - rightViewport.extentSize.width).coerceAtLeast(0)
+                val clampedRightX = if (changedX) leftPos.x.coerceIn(0, maxRightX) else rightViewport.viewPosition.x
                 lastRightScrollY = clampedRightY
-                rightViewport.viewPosition = java.awt.Point(rightViewport.viewPosition.x, clampedRightY)
+                lastRightScrollX = clampedRightX
+                rightViewport.viewPosition = java.awt.Point(clampedRightX, clampedRightY)
             } finally {
                 syncingScroll = false
             }
@@ -404,8 +413,12 @@ class TwoWayDiffPanel(
         rightEditorPane.scrollPane.viewport.addChangeListener {
             dividerComponent.repaint()
             val rightPos = rightEditorPane.scrollPane.viewport.viewPosition
-            if (syncingScroll || rightPos.y == lastRightScrollY) return@addChangeListener
+            if (syncingScroll) return@addChangeListener
+            val changedX = rightPos.x != lastRightScrollX
+            val changedY = rightPos.y != lastRightScrollY
+            lastRightScrollX = rightPos.x
             lastRightScrollY = rightPos.y
+            if (!changedX && !changedY) return@addChangeListener
             syncingScroll = true
             try {
                 val lineHeight = rightEditorPane.textArea.lineHeight.coerceAtLeast(16)
@@ -415,9 +428,12 @@ class TwoWayDiffPanel(
                 ).roundToInt().coerceAtLeast(0)
                 val leftViewport = leftEditorPane.scrollPane.viewport
                 val maxLeftY = (leftEditorPane.textArea.height - leftViewport.extentSize.height).coerceAtLeast(0)
-                val clampedLeftY = targetY.coerceAtMost(maxLeftY)
+                val clampedLeftY = if (changedY) targetY.coerceAtMost(maxLeftY) else leftViewport.viewPosition.y
+                val maxLeftX = (leftEditorPane.textArea.width - leftViewport.extentSize.width).coerceAtLeast(0)
+                val clampedLeftX = if (changedX) rightPos.x.coerceIn(0, maxLeftX) else leftViewport.viewPosition.x
                 lastLeftScrollY = clampedLeftY
-                leftViewport.viewPosition = java.awt.Point(leftViewport.viewPosition.x, clampedLeftY)
+                lastLeftScrollX = clampedLeftX
+                leftViewport.viewPosition = java.awt.Point(clampedLeftX, clampedLeftY)
             } finally {
                 syncingScroll = false
             }

@@ -47,6 +47,70 @@ class SwingUiRenderTest {
     }
 
     @Test
+    fun `horizontal scrolling synchronizes both ways and clamps without vertical drift`() {
+        javax.swing.SwingUtilities.invokeAndWait {
+            DiffThemeManager.initialize(AppTheme.DARK)
+            val left = DiffDocument((1..60).joinToString("\n") { "left $it " + "x".repeat(300) })
+            val right = DiffDocument((1..60).joinToString("\n") { "right $it " + "x".repeat(150) })
+            val session = TwoWayDiffSession(left, right)
+            val panel = TwoWayDiffPanel(session)
+            layoutAndPaintOffscreen(panel, 1200, 600)
+            val l = panel.leftEditorPane.scrollPane
+            val r = panel.rightEditorPane.scrollPane
+            assertTrue(l.horizontalScrollBar.isVisible)
+            assertTrue(r.horizontalScrollBar.isVisible)
+
+            l.viewport.viewPosition = java.awt.Point(0, 120)
+            val leftY = l.viewport.viewPosition.y
+            val rightY = r.viewport.viewPosition.y
+            l.horizontalScrollBar.value = 200
+            assertEquals(200, r.viewport.viewPosition.x)
+            r.horizontalScrollBar.value = 100
+            assertEquals(100, l.viewport.viewPosition.x)
+            assertEquals(leftY, l.viewport.viewPosition.y)
+            assertEquals(rightY, r.viewport.viewPosition.y)
+
+            l.horizontalScrollBar.value = l.horizontalScrollBar.maximum
+            assertEquals(r.viewport.viewSize.width - r.viewport.extentSize.width, r.viewport.viewPosition.x)
+            assertTrue(l.viewport.viewPosition.x > r.viewport.viewPosition.x)
+            // A vertical-only move on the clamped pane must not pull the longer pane back.
+            val farLeftX = l.viewport.viewPosition.x
+            r.viewport.viewPosition = java.awt.Point(r.viewport.viewPosition.x, rightY + 30)
+            assertEquals(farLeftX, l.viewport.viewPosition.x)
+
+            // FlatLaf's wheel handler routes Shift+wheel to the horizontal scrollbar.
+            l.horizontalScrollBar.value = 0
+            val wheel = java.awt.event.MouseWheelEvent(
+                l, java.awt.event.MouseEvent.MOUSE_WHEEL, 0,
+                java.awt.event.InputEvent.SHIFT_DOWN_MASK, 10, 10, 0, false,
+                java.awt.event.MouseWheelEvent.WHEEL_UNIT_SCROLL, 3, 1
+            )
+            l.dispatchEvent(wheel)
+            assertTrue(l.viewport.viewPosition.x > 0)
+            assertEquals(l.viewport.viewPosition.x, r.viewport.viewPosition.x)
+            assertTrue(!session.hasUnsavedChanges())
+        }
+    }
+
+    @Test
+    fun `horizontal scrollbar hides for short lines and unified navigation preserves X`() {
+        javax.swing.SwingUtilities.invokeAndWait {
+            DiffThemeManager.initialize(AppTheme.DARK)
+            val short = TwoWayDiffPanel(TwoWayDiffSession(DiffDocument("a"), DiffDocument("b")))
+            layoutAndPaintOffscreen(short, 1200, 600)
+            assertTrue(!short.leftEditorPane.scrollPane.horizontalScrollBar.isVisible)
+            val session = TwoWayDiffSession(DiffDocument("x".repeat(500)), DiffDocument("y".repeat(500)))
+            val unified = org.ijdiff.ui.swing.twoway.UnifiedDiffPane("test.txt")
+            unified.updateUnifiedResult(session.state.value.unifiedResult)
+            layoutAndPaintOffscreen(unified, 600, 300)
+            assertTrue(unified.scrollPane.horizontalScrollBar.isVisible)
+            unified.scrollPane.horizontalScrollBar.value = 200
+            unified.scrollToUnifiedBlock(0)
+            assertEquals(200, unified.scrollPane.viewport.viewPosition.x)
+        }
+    }
+
+    @Test
     fun `TwoWayDiffPanel renders Side-by-Side and Unified views cleanly in Dark and Light themes`() {
         DiffThemeManager.initialize(AppTheme.DARK)
         val left = DiffDocument(

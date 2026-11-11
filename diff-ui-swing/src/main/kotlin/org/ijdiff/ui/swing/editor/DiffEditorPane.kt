@@ -76,6 +76,7 @@ class DiffEditorPane(
 
     init {
         textArea.font = DiffThemeManager.editorFont
+        textArea.lineWrap = false
         textArea.tabSize = 4
         textArea.tabsEmulated = true
         textArea.isEditable = !document.isReadOnly
@@ -99,6 +100,8 @@ class DiffEditorPane(
         scrollPane.setRowHeaderView(gutterComponent)
         scrollPane.border = BorderFactory.createEmptyBorder()
         scrollPane.verticalScrollBar.unitIncrement = 16
+        scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
+        scrollPane.horizontalScrollBar.unitIncrement = 16
         scrollPane.viewport.addChangeListener {
             gutterComponent.repaint()
         }

@@ -1,6 +1,7 @@
 package org.ijdiff.ui.compose.twoway
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -114,6 +115,10 @@ fun ComposeTwoWayDiffView(
     val leftListState = rememberLazyListState()
     val rightListState = rememberLazyListState()
     val unifiedListState = rememberLazyListState()
+    val leftHorizontalScroll = rememberScrollState()
+    val rightHorizontalScroll = rememberScrollState()
+
+    SynchronizeHorizontalScrolling(leftHorizontalScroll, rightHorizontalScroll)
     val scope = rememberCoroutineScope()
 
     val lineHeightDp: Dp = (theme.editorFontSizePt + 8).dp
@@ -403,6 +408,7 @@ fun ComposeTwoWayDiffView(
                     fragments = state.fragments,
                     activeFragmentIndex = state.currentFragmentIndex,
                     listState = leftListState,
+                    horizontalScroll = leftHorizontalScroll,
                     lineHeightDp = lineHeightDp,
                     editMode = editMode,
                     canTargetAcceptChunks = !session.rightDocument.isReadOnly,
@@ -440,6 +446,7 @@ fun ComposeTwoWayDiffView(
                     fragments = state.fragments,
                     activeFragmentIndex = state.currentFragmentIndex,
                     listState = rightListState,
+                    horizontalScroll = rightHorizontalScroll,
                     lineHeightDp = lineHeightDp,
                     editMode = editMode,
                     canTargetAcceptChunks = !session.leftDocument.isReadOnly,
@@ -478,12 +485,13 @@ fun ComposeTwoWayDiffView(
 }
 
 @Composable
-private fun ComposeDiffSidePane(
+internal fun ComposeDiffSidePane(
     isLeft: Boolean,
     document: DiffDocument,
     fragments: List<LineFragment>,
     activeFragmentIndex: Int,
     listState: LazyListState,
+    horizontalScroll: ScrollState,
     lineHeightDp: Dp,
     editMode: Boolean,
     canTargetAcceptChunks: Boolean,
@@ -495,7 +503,7 @@ private fun ComposeDiffSidePane(
     val palette = theme.palette
     val text by document.text.collectAsState()
     val lines = remember(text) { text.split('\n') }
-    val horizontalScroll = rememberScrollState()
+    val contentWidth = rememberCodeWidth(lines)
     val editScroll = rememberScrollState()
 
     // Map each 0-based line to its containing fragment & inline highlight ranges
@@ -563,184 +571,191 @@ private fun ComposeDiffSidePane(
         markers
     }
 
-    Box(
+    Column(
         modifier = modifier
             .background(palette.editorBg)
+            .horizontalWheelScroll(horizontalScroll)
     ) {
-        if (editMode && !document.isReadOnly) {
-            BasicTextField(
-                value = text,
-                onValueChange = { onTextEdited(it) },
-                textStyle = TextStyle(
-                    color = palette.editorFg,
-                    fontFamily = theme.editorFontFamily,
-                    fontSize = theme.editorFontSizePt.sp,
-                    lineHeight = lineHeightDp.value.sp
-                ),
-                cursorBrush = SolidColor(palette.editorFg),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(editScroll)
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-            )
-        } else {
-            val gutterDigits = max(3, lines.size.toString().length)
-            val gutterNumWidth = (gutterDigits * (theme.editorFontSizePt * 0.68f).roundToInt() + 14).dp
-            val actionColWidth = AppTheme.spacing.gutterActionWidth
-            val chevronWidth = AppTheme.spacing.gutterIconWidth
-            val chevronHeight = AppTheme.spacing.gutterIconHeight
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (editMode && !document.isReadOnly) {
+                BasicTextField(
+                    value = text,
+                    onValueChange = { onTextEdited(it) },
+                    textStyle = TextStyle(
+                        color = palette.editorFg,
+                        fontFamily = theme.editorFontFamily,
+                        fontSize = theme.editorFontSizePt.sp,
+                        lineHeight = lineHeightDp.value.sp
+                    ),
+                    cursorBrush = SolidColor(palette.editorFg),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(editScroll)
+                        .horizontalScroll(horizontalScroll)
+                        .width(contentWidth + 8.dp)
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            } else {
+                val gutterDigits = max(3, lines.size.toString().length)
+                val gutterNumWidth = (gutterDigits * (theme.editorFontSizePt * 0.68f).roundToInt() + 14).dp
+                val actionColWidth = AppTheme.spacing.gutterActionWidth
+                val chevronWidth = AppTheme.spacing.gutterIconWidth
+                val chevronHeight = AppTheme.spacing.gutterIconHeight
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                itemsIndexed(lines) { lineIdx, lineStr ->
-                    val info = lineInfoMap[lineIdx]
-                    val emptyMarkerType = emptyRangeMarkers[lineIdx]
-                    val lineBg = info?.let { palette.getLineBg(it.diffType) } ?: palette.editorBg
-                    val isActiveFragment = info != null && info.fragmentIndex == activeFragmentIndex
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    itemsIndexed(lines) { lineIdx, lineStr ->
+                        val info = lineInfoMap[lineIdx]
+                        val emptyMarkerType = emptyRangeMarkers[lineIdx]
+                        val lineBg = info?.let { palette.getLineBg(it.diffType) } ?: palette.editorBg
+                        val isActiveFragment = info != null && info.fragmentIndex == activeFragmentIndex
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(lineHeightDp)
-                            .background(lineBg)
-                    ) {
-                        // Gutter (Line Number + >> / << Chunk Button)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
+                                .fillMaxWidth()
                                 .height(lineHeightDp)
-                                .background(info?.let { palette.getLineBg(it.diffType) } ?: palette.gutterBg)
+                                .background(lineBg)
                         ) {
-                            if (!isLeft) {
-                                // Right pane: << button on the left edge of gutter
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .width(actionColWidth)
-                                        .fillMaxHeight()
-                                        .let { mod ->
-                                            if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
-                                                mod.clickable { onChunkAction(info.fragment) }
-                                            } else mod
-                                        }
-                                ) {
-                                    if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
-                                        ComposeVectorIcon(
-                                            kind = VectorIconKind.CHEVRON_LEFT,
-                                            tint = palette.getBorderColor(info.diffType),
-                                            modifier = Modifier.width(chevronWidth).height(chevronHeight)
-                                        )
-                                    }
-                                }
-                            }
-
-                            AppText(
-                                text = (lineIdx + 1).toString(),
-                                color = palette.gutterFg,
-                                fontFamily = theme.editorFontFamily,
-                                fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
-                                textAlign = TextAlign.End,
+                            // Gutter (Line Number + >> / << Chunk Button)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .width(gutterNumWidth)
-                                    .padding(end = 6.dp)
-                            )
-
-                            if (isLeft) {
-                                // Left pane: >> button on the right edge of gutter
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .width(actionColWidth)
-                                        .fillMaxHeight()
-                                        .let { mod ->
-                                            if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
-                                                mod.clickable { onChunkAction(info.fragment) }
-                                            } else mod
+                                    .height(lineHeightDp)
+                                    .background(info?.let { palette.getLineBg(it.diffType) } ?: palette.gutterBg)
+                            ) {
+                                if (!isLeft) {
+                                    // Right pane: << button on the left edge of gutter
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .width(actionColWidth)
+                                            .fillMaxHeight()
+                                            .let { mod ->
+                                                if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                                    mod.clickable { onChunkAction(info.fragment) }
+                                                } else mod
+                                            }
+                                    ) {
+                                        if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                            ComposeVectorIcon(
+                                                kind = VectorIconKind.CHEVRON_LEFT,
+                                                tint = palette.getBorderColor(info.diffType),
+                                                modifier = Modifier.width(chevronWidth).height(chevronHeight)
+                                            )
                                         }
-                                ) {
-                                    if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
-                                        ComposeVectorIcon(
-                                            kind = VectorIconKind.CHEVRON_RIGHT,
-                                            tint = palette.getBorderColor(info.diffType),
-                                            modifier = Modifier.width(chevronWidth).height(chevronHeight)
-                                        )
+                                    }
+                                }
+
+                                AppText(
+                                    text = (lineIdx + 1).toString(),
+                                    color = palette.gutterFg,
+                                    fontFamily = theme.editorFontFamily,
+                                    fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier
+                                        .width(gutterNumWidth)
+                                        .padding(end = 6.dp)
+                                )
+
+                                if (isLeft) {
+                                    // Left pane: >> button on the right edge of gutter
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .width(actionColWidth)
+                                            .fillMaxHeight()
+                                            .let { mod ->
+                                                if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                                    mod.clickable { onChunkAction(info.fragment) }
+                                                } else mod
+                                            }
+                                    ) {
+                                        if (info != null && info.isFirstLineOfFragment && canTargetAcceptChunks) {
+                                            ComposeVectorIcon(
+                                                kind = VectorIconKind.CHEVRON_RIGHT,
+                                                tint = palette.getBorderColor(info.diffType),
+                                                modifier = Modifier.width(chevronWidth).height(chevronHeight)
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        // Gutter vertical divider
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .fillMaxHeight()
-                                .background(palette.gutterBorder)
-                        )
-
-                        // Code line with syntax + inline word diff highlights
-                        Box(
-                            contentAlignment = Alignment.CenterStart,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .horizontalScroll(horizontalScroll)
-                                .padding(horizontal = 8.dp)
-                        ) {
-                            val nerdFam = theme.nerdFontFamily
-                            val edSizePt = theme.editorFontSizePt
-                            val annotated = remember(lineStr, palette, info?.inlineRanges, nerdFam, edSizePt) {
-                                ComposeSyntaxHighlighter.highlightLine(
-                                    lineText = lineStr.replace("\t", "    "),
-                                    palette = palette,
-                                    inlineRanges = info?.inlineRanges ?: emptyList(),
-                                    nerdFontFamily = nerdFam,
-                                    baseFontSizeSp = edSizePt.toFloat()
-                                )
-                            }
-                            AppText(
-                                text = annotated,
-                                color = palette.editorFg,
-                                fontFamily = theme.editorFontFamily,
-                                fontSize = theme.editorFontSizePt.sp,
-                                softWrap = false,
-                                maxLines = 1
+                            // Gutter vertical divider
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .fillMaxHeight()
+                                    .background(palette.gutterBorder)
                             )
 
-                            if (emptyMarkerType != null) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(2.dp)
-                                        .align(Alignment.TopStart)
-                                        .background(palette.getBorderColor(emptyMarkerType))
+                            // Code line with syntax + inline word diff highlights
+                            Box(
+                                contentAlignment = Alignment.CenterStart,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .horizontalScroll(horizontalScroll)
+                                    .width(contentWidth)
+                                    .padding(horizontal = 8.dp)
+                            ) {
+                                val nerdFam = theme.nerdFontFamily
+                                val edSizePt = theme.editorFontSizePt
+                                val annotated = remember(lineStr, palette, info?.inlineRanges, nerdFam, edSizePt) {
+                                    ComposeSyntaxHighlighter.highlightLine(
+                                        lineText = lineStr.replace("\t", "    "),
+                                        palette = palette,
+                                        inlineRanges = info?.inlineRanges ?: emptyList(),
+                                        nerdFontFamily = nerdFam,
+                                        baseFontSizeSp = edSizePt.toFloat()
+                                    )
+                                }
+                                AppText(
+                                    text = annotated,
+                                    color = palette.editorFg,
+                                    fontFamily = theme.editorFontFamily,
+                                    fontSize = theme.editorFontSizePt.sp,
+                                    softWrap = false,
+                                    maxLines = 1
                                 )
-                            }
-                            if (isActiveFragment && info.isFirstLineOfFragment) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(1.5.dp)
-                                        .align(Alignment.TopStart)
-                                        .background(palette.activeFragmentBorder)
-                                )
-                            }
-                            if (isActiveFragment && info.isLastLineOfFragment) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(1.5.dp)
-                                        .align(Alignment.BottomStart)
-                                        .background(palette.activeFragmentBorder)
-                                )
+
+                                if (emptyMarkerType != null) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .align(Alignment.TopStart)
+                                            .background(palette.getBorderColor(emptyMarkerType))
+                                    )
+                                }
+                                if (isActiveFragment && info.isFirstLineOfFragment) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.5.dp)
+                                            .align(Alignment.TopStart)
+                                            .background(palette.activeFragmentBorder)
+                                    )
+                                }
+                                if (isActiveFragment && info.isLastLineOfFragment) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.5.dp)
+                                            .align(Alignment.BottomStart)
+                                            .background(palette.activeFragmentBorder)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+        CodeHorizontalScrollbar(horizontalScroll)
     }
 }
 
@@ -959,103 +974,106 @@ private fun ComposeOverviewBarCanvas(
 }
 
 @Composable
-private fun ComposeUnifiedDiffPane(
+internal fun ComposeUnifiedDiffPane(
     unifiedResult: UnifiedFragmentBuilder.UnifiedDiffResult,
     listState: LazyListState,
-    lineHeightDp: Dp
+    lineHeightDp: Dp,
+    horizontalScroll: ScrollState = rememberScrollState()
 ) {
     val theme = LocalComposeThemeState.current
     val palette = theme.palette
     val lines = remember(unifiedResult.text) { unifiedResult.text.split('\n') }
-    val horizontalScroll = rememberScrollState()
+    val contentWidth = rememberCodeWidth(lines)
     val colWidth = (theme.editorFontSizePt * 3 + 4).coerceAtLeast(42).dp
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(palette.editorBg)
-    ) {
-        itemsIndexed(lines) { uLine, lineStr ->
-            val mapping = unifiedResult.lineMappings.getOrNull(uLine)
-            val diffType = mapping?.type
-            val lineBg = diffType?.let { palette.getLineBg(it) } ?: palette.editorBg
+    Column(Modifier.fillMaxSize().background(palette.editorBg).horizontalWheelScroll(horizontalScroll)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).fillMaxWidth()
+        ) {
+            itemsIndexed(lines) { uLine, lineStr ->
+                val mapping = unifiedResult.lineMappings.getOrNull(uLine)
+                val diffType = mapping?.type
+                val lineBg = diffType?.let { palette.getLineBg(it) } ?: palette.editorBg
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(lineHeightDp)
-                    .background(lineBg)
-            ) {
-                // Dual left/right line-number gutter
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
+                        .fillMaxWidth()
                         .height(lineHeightDp)
-                        .background(diffType?.let { palette.getLineBg(it) } ?: palette.gutterBg)
+                        .background(lineBg)
                 ) {
-                    AppText(
-                        text = if (mapping != null && mapping.leftLine >= 0) (mapping.leftLine + 1).toString() else "",
-                        color = palette.gutterFg,
-                        fontFamily = theme.editorFontFamily,
-                        fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.width(colWidth).padding(end = 6.dp)
-                    )
-                    Box(Modifier.width(1.dp).fillMaxHeight().background(palette.gutterBorder))
-                    AppText(
-                        text = if (mapping != null && mapping.rightLine >= 0) (mapping.rightLine + 1).toString() else "",
-                        color = palette.gutterFg,
-                        fontFamily = theme.editorFontFamily,
-                        fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.width(colWidth).padding(end = 6.dp)
-                    )
-                    AppText(
-                        text = when (diffType) {
-                            TextDiffType.DELETED -> "-"
-                            TextDiffType.INSERTED -> "+"
-                            else -> " "
-                        },
-                        color = diffType?.let { palette.getBorderColor(it) } ?: palette.gutterFg,
-                        fontFamily = theme.editorFontFamily,
-                        fontSize = theme.editorFontSizePt.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.width(14.dp)
-                    )
-                }
-
-                Box(Modifier.width(1.dp).fillMaxHeight().background(palette.gutterBorder))
-
-                Box(
-                    contentAlignment = Alignment.CenterStart,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .horizontalScroll(horizontalScroll)
-                        .padding(horizontal = 8.dp)
-                ) {
-                    val nerdFam = theme.nerdFontFamily
-                    val edSizePt = theme.editorFontSizePt
-                    val annotated = remember(lineStr, palette, nerdFam, edSizePt) {
-                        ComposeSyntaxHighlighter.highlightLine(
-                            lineText = lineStr.replace("\t", "    "),
-                            palette = palette,
-                            nerdFontFamily = nerdFam,
-                            baseFontSizeSp = edSizePt.toFloat()
+                    // Dual left/right line-number gutter
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .height(lineHeightDp)
+                            .background(diffType?.let { palette.getLineBg(it) } ?: palette.gutterBg)
+                    ) {
+                        AppText(
+                            text = if (mapping != null && mapping.leftLine >= 0) (mapping.leftLine + 1).toString() else "",
+                            color = palette.gutterFg,
+                            fontFamily = theme.editorFontFamily,
+                            fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.width(colWidth).padding(end = 6.dp)
+                        )
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(palette.gutterBorder))
+                        AppText(
+                            text = if (mapping != null && mapping.rightLine >= 0) (mapping.rightLine + 1).toString() else "",
+                            color = palette.gutterFg,
+                            fontFamily = theme.editorFontFamily,
+                            fontSize = (theme.editorFontSizePt - 1).coerceAtLeast(9).sp,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.width(colWidth).padding(end = 6.dp)
+                        )
+                        AppText(
+                            text = when (diffType) {
+                                TextDiffType.DELETED -> "-"
+                                TextDiffType.INSERTED -> "+"
+                                else -> " "
+                            },
+                            color = diffType?.let { palette.getBorderColor(it) } ?: palette.gutterFg,
+                            fontFamily = theme.editorFontFamily,
+                            fontSize = theme.editorFontSizePt.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(14.dp)
                         )
                     }
-                    AppText(
-                        text = annotated,
-                        color = palette.editorFg,
-                        fontFamily = theme.editorFontFamily,
-                        fontSize = theme.editorFontSizePt.sp,
-                        softWrap = false,
-                        maxLines = 1
-                    )
+
+                    Box(Modifier.width(1.dp).fillMaxHeight().background(palette.gutterBorder))
+
+                    Box(
+                        contentAlignment = Alignment.CenterStart,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .horizontalScroll(horizontalScroll)
+                            .width(contentWidth)
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        val nerdFam = theme.nerdFontFamily
+                        val edSizePt = theme.editorFontSizePt
+                        val annotated = remember(lineStr, palette, nerdFam, edSizePt) {
+                            ComposeSyntaxHighlighter.highlightLine(
+                                lineText = lineStr.replace("\t", "    "),
+                                palette = palette,
+                                nerdFontFamily = nerdFam,
+                                baseFontSizeSp = edSizePt.toFloat()
+                            )
+                        }
+                        AppText(
+                            text = annotated,
+                            color = palette.editorFg,
+                            fontFamily = theme.editorFontFamily,
+                            fontSize = theme.editorFontSizePt.sp,
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
+        CodeHorizontalScrollbar(horizontalScroll)
     }
 }

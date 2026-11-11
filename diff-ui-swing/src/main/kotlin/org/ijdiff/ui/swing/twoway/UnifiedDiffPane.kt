@@ -57,6 +57,7 @@ class UnifiedDiffPane(
 
     init {
         textArea.font = DiffThemeManager.editorFont
+        textArea.lineWrap = false
         textArea.tabSize = 4
         textArea.tabsEmulated = true
         textArea.isEditable = false
@@ -69,6 +70,8 @@ class UnifiedDiffPane(
         scrollPane.setRowHeaderView(gutter)
         scrollPane.border = BorderFactory.createEmptyBorder()
         scrollPane.verticalScrollBar.unitIncrement = 16
+        scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
+        scrollPane.horizontalScrollBar.unitIncrement = 16
         scrollPane.viewport.addChangeListener { gutter.repaint() }
 
         add(scrollPane, BorderLayout.CENTER)
@@ -102,7 +105,7 @@ class UnifiedDiffPane(
         val viewportHeight = scrollPane.viewport.extentSize.height
         val targetY = (line * lineHeight - viewportHeight / 3).coerceAtLeast(0)
         val maxScroll = (textArea.height - viewportHeight).coerceAtLeast(0)
-        scrollPane.viewport.viewPosition = java.awt.Point(0, targetY.coerceAtMost(maxScroll))
+        scrollPane.viewport.viewPosition = java.awt.Point(scrollPane.viewport.viewPosition.x, targetY.coerceAtMost(maxScroll))
     }
 
     private fun paintUnifiedHighlights(g2: Graphics2D) {
